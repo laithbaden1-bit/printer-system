@@ -1,0 +1,12 @@
+<body dir="rtl">
+    <h2>نظام الطابعات</h2>
+    <form action="/add" method="post">
+        <input name="name" placeholder="الاسم"> <input name="ip" placeholder="IP">
+        <button>إضافة</button>
+    </form>
+    <table border="1">
+        {% for p in printers %}
+        <tr><td>{{ p.name }}</td><td>{{ p.ip }}</td></tr>
+        {% endfor %}
+    </table>
+</body>
