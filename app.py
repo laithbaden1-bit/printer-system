@@ -5,7 +5,7 @@ import io
 import psycopg2
 import psycopg2.extras
 from datetime import timedelta
-from flask import Flask, request, redirect, render_template_string, session, url_for, flash
+from flask import Flask, request, redirect, render_template_string, session, url_for, flash, make_response
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # 2. إعدادات التطبيق الأساسية (مع حماية الجلسات)
@@ -15,8 +15,9 @@ app.permanent_session_lifetime = timedelta(days=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# --- جلب رابط قاعدة البيانات الدائمة من إعدادات Render ---
-DATABASE_URL = "postgresql://neondb_owner:npg_A4ogyrDlUT2h@ep-small-shadow-aieet5rw-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require"
+# --- الرابط السري للتجربة المحلية ---
+# (تذكر إرجاعه إلى os.environ.get('DATABASE_URL') قبل الرفع لـ GitHub)
+DATABASE_URL = os.environ.get('DATABASE_URL')
 # --------------------------------------------------------
 
 # --- دروع الأمان (Security Headers) ---
@@ -46,11 +47,14 @@ LANGS = {
 # --- 4. واجهات العرض (HTML) ---
 DASHBOARD_UI = """
 <div class="row mb-4">
-    <div class="col-md-6"><h3><i class="fas fa-list text-primary"></i> {{ L['home'] }}</h3></div>
-    <div class="col-md-6 text-end">
-        <form action="/" method="GET" class="d-flex">
-            <input name="q" class="form-control me-2 shadow-sm" placeholder="{{ L['search'] }}" value="{{ query }}">
-            <button class="btn btn-primary shadow-sm"><i class="fas fa-search"></i></button>
+    <div class="col-md-4"><h3><i class="fas fa-list text-primary"></i> {{ L['home'] }}</h3></div>
+    <div class="col-md-8 text-end">
+        <form action="/" method="GET" class="d-flex justify-content-end">
+            <input name="q" class="form-control me-2 shadow-sm w-50" placeholder="{{ L['search'] }}" value="{{ query }}">
+            <button class="btn btn-primary shadow-sm me-2"><i class="fas fa-search"></i></button>
+            {% if session.get('role') in ['admin', 'entry'] %}
+            <a href="/export_csv" class="btn btn-success shadow-sm text-nowrap"><i class="fas fa-file-excel"></i> تصدير (Excel)</a>
+            {% endif %}
         </form>
     </div>
 </div>
@@ -78,17 +82,17 @@ DASHBOARD_UI = """
             </select>
         </div>
         <div class="col-md-4"><input name="notes" class="form-control" placeholder="{{ L['notes'] }}"></div>
-        <div class="col-md-2"><button class="btn btn-success w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div>
+        <div class="col-md-2"><button class="btn btn-primary w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div>
     </form>
     
     <hr class="my-4">
-    <h5 class="mb-3 text-info"><i class="fas fa-file-excel"></i> رفع مجموعة طابعات (ملف CSV)</h5>
+    <h5 class="mb-3 text-info"><i class="fas fa-upload"></i> رفع مجموعة طابعات (ملف CSV)</h5>
     <form action="/upload_csv" method="POST" enctype="multipart/form-data" class="row g-3 align-items-center">
         <div class="col-md-6">
             <input type="file" name="csv_file" class="form-control" accept=".csv" required>
         </div>
         <div class="col-md-3">
-            <button type="submit" class="btn btn-info text-white w-100"><i class="fas fa-upload"></i> رفع الملف</button>
+            <button type="submit" class="btn btn-info text-white w-100"><i class="fas fa-cloud-upload-alt"></i> رفع الملف</button>
         </div>
     </form>
 </div>
@@ -118,7 +122,7 @@ DASHBOARD_UI = """
                     <a href="/edit/{{ p['id'] }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
                     {% endif %}
                     {% if session.get('role') == 'admin' %}
-                    <a href="/delete/{{ p['id'] }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد؟')"><i class="fas fa-trash"></i></a>
+                    <a href="/delete/{{ p['id'] }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذه الطابعة؟')"><i class="fas fa-trash"></i></a>
                     {% endif %}
                 </td>
             </tr>
@@ -166,7 +170,6 @@ EDIT_UI = """
 </div>
 """
 
-# --- واجهة التقارير الجديدة والاحترافية ---
 REPORTS_UI = """
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -254,7 +257,6 @@ REPORTS_UI = """
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    // إعدادات الرسم البياني لحالة الطابعات
     new Chart(document.getElementById('statusChart'), {
         type: 'doughnut',
         data: {
@@ -269,7 +271,6 @@ document.addEventListener("DOMContentLoaded", function() {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
     });
 
-    // إعدادات الرسم البياني لنوع الطباعة
     new Chart(document.getElementById('typeChart'), {
         type: 'pie',
         data: {
@@ -412,7 +413,6 @@ def reports():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
-    # الإحصائيات الأساسية
     stats = {}
     cur.execute("SELECT COUNT(*) FROM printers")
     stats['total'] = cur.fetchone()[0]
@@ -423,13 +423,11 @@ def reports():
     cur.execute("SELECT COUNT(*) FROM printers WHERE status='Broken'")
     stats['broken'] = cur.fetchone()[0]
     
-    # إحصائيات نوع الطباعة
     cur.execute("SELECT COUNT(*) FROM printers WHERE color_type='Color'")
     stats['color'] = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM printers WHERE color_type='BW'")
     stats['bw'] = cur.fetchone()[0]
     
-    # إحصائيات الأقسام
     cur.execute("SELECT department, COUNT(*) as count FROM printers WHERE department != '' GROUP BY department ORDER BY count DESC")
     dept_stats = cur.fetchall()
     
@@ -582,6 +580,38 @@ def upload_csv():
     else: flash("الرجاء رفع ملف بصيغة CSV فقط", "error")
     return redirect(url_for('index'))
 
+# --- مسار التصدير إلى إكسل الجديد ---
+@app.route('/export_csv')
+def export_csv():
+    if session.get('role') not in ['admin', 'entry']: 
+        return redirect(url_for('index'))
+        
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT name, serial, department, status, code, color_type, notes FROM printers ORDER BY id DESC")
+    printers = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    # تجهيز ملف الـ CSV
+    si = io.StringIO()
+    # إضافة BOM لكي يدعم الإكسل اللغة العربية بشكل صحيح
+    si.write('\ufeff')
+    cw = csv.writer(si)
+    
+    # كتابة العناوين (رأس الجدول)
+    cw.writerow(['الاسم / النوع', 'الرقم التسلسلي', 'القسم', 'الحالة', 'الرمز', 'نوع الطباعة', 'ملاحظات'])
+    
+    # كتابة بيانات الطابعات
+    for p in printers:
+        cw.writerow([p['name'], p['serial'], p['department'], p['status'], p['code'], p['color_type'], p['notes']])
+
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=printers_backup.csv"
+    output.headers["Content-type"] = "text/csv; charset=utf-8"
+    return output
+# -----------------------------------
+
 @app.route('/edit/<int:pid>', methods=['GET', 'POST'])
 def edit(pid):
     if session.get('role') not in ['admin', 'entry']: return redirect(url_for('index'))
@@ -627,4 +657,4 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
