@@ -4,97 +4,320 @@ import csv
 import io
 import psycopg2
 import psycopg2.extras
+from datetime import timedelta
 from flask import Flask, request, redirect, render_template_string, session, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# 2. إعدادات التطبيق الأساسية
+# 2. إعدادات التطبيق الأساسية (مع حماية الجلسات)
 app = Flask(__name__)
-app.secret_key = 'printer_system_pro_2026'
+app.secret_key = 'printer_system_pro_2026_super_secret'
+app.permanent_session_lifetime = timedelta(days=30)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # --- جلب رابط قاعدة البيانات الدائمة من إعدادات Render ---
-DATABASE_URL = os.environ.get('DATABASE_URL')
+DATABASE_URL = "postgresql://neondb_owner:npg_A4ogyrDlUT2h@ep-small-shadow-aieet5rw-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require"
 # --------------------------------------------------------
 
-# 3. القاموس اللغوي (تم اختصاره هنا لتوفير المساحة، لكنه يعمل بنفس طريقتك)
+# --- دروع الأمان (Security Headers) ---
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    return response
+# ---------------------------------------
+
+# 3. القاموس اللغوي
 LANGS = {
     'ar': {
         'title': 'نظام إدارة الطابعات', 'home': 'الرئيسية', 'reports': 'التقارير', 'users_manage': 'إدارة المستخدمين',
         'add': 'إضافة', 'edit': 'تعديل', 'delete': 'حذف', 'search': 'بحث...', 'logout': 'خروج',
         'status': 'الحالة', 'working': 'تعمل', 'maintenance': 'صيانة', 'broken': 'لا تعمل',
-        'serial': 'الرقم التسلسلي', 'dept': 'القسم', 'name': 'الاسم', 'role': 'الدور',
+        'serial': 'الرقم التسلسلي', 'dept': 'القسم', 'name': 'نوع وموديل الطابعة', 'role': 'الدور',
         'admin': 'مدير', 'entry': 'مدخل بيانات', 'user': 'مستخدم', 'save': 'حفظ التغييرات',
         'login': 'تسجيل الدخول', 'username': 'اسم المستخدم', 'password': 'كلمة المرور',
         'total': 'إجمالي الطابعات', 'depts_count': 'أقسام مسجلة',
-        'code': 'الرمز', 'notes': 'ملاحظات', 'edit_printer': 'تعديل بيانات الطابعة'
+        'code': 'الرمز', 'notes': 'ملاحظات', 'edit_printer': 'تعديل بيانات الطابعة',
+        'color_type': 'نوع الطباعة', 'color': 'ملون', 'bw': 'أبيض وأسود', 'remember': 'تذكرني'
     }
 }
-# يمكنك إضافة القاموس الإنجليزي 'en' كما كان في كودك السابق إذا أردت.
 
 # --- 4. واجهات العرض (HTML) ---
-# احتفظت بتصميمك بالكامل، لم يتغير شيء في الواجهات.
-# (تمت إزالة نصوص الواجهات من هذا المربع فقط لكي لا يكون الرد طويلاً جداً عليك، 
-# يرجى نسخ نصوص `DASHBOARD_UI` و `EDIT_UI` و `REPORTS_UI` و `USERS_UI` من ملفك القديم ووضعها هنا).
+DASHBOARD_UI = """
+<div class="row mb-4">
+    <div class="col-md-6"><h3><i class="fas fa-list text-primary"></i> {{ L['home'] }}</h3></div>
+    <div class="col-md-6 text-end">
+        <form action="/" method="GET" class="d-flex">
+            <input name="q" class="form-control me-2 shadow-sm" placeholder="{{ L['search'] }}" value="{{ query }}">
+            <button class="btn btn-primary shadow-sm"><i class="fas fa-search"></i></button>
+        </form>
+    </div>
+</div>
 
-# سأضع لك الواجهات هنا باختصار، انسخ الواجهات القديمة وضعها في هذه المساحة.
-DASHBOARD_UI = """<div class="row mb-4"><div class="col-md-6"><h3><i class="fas fa-list text-primary"></i> {{ L['home'] }}</h3></div><div class="col-md-6 text-end"><form action="/" method="GET" class="d-flex"><input name="q" class="form-control me-2 shadow-sm" placeholder="{{ L['search'] }}" value="{{ query }}"><button class="btn btn-primary shadow-sm"><i class="fas fa-search"></i></button></form></div></div>{% if session.get('role') in ['admin', 'entry'] %}<div class="card p-4 mb-4 border-0 shadow-sm bg-light"><h5 class="mb-3 text-primary"><i class="fas fa-plus-circle"></i> إضافة طابعة يدوياً</h5><form action="/add" method="POST" class="row g-3"><div class="col-md-2"><input name="name" class="form-control" placeholder="{{ L['name'] }}" required></div><div class="col-md-2"><input name="serial" class="form-control" placeholder="{{ L['serial'] }}" required></div><div class="col-md-2"><input name="dept" class="form-control" placeholder="{{ L['dept'] }}"></div><div class="col-md-2"><input name="code" class="form-control" placeholder="{{ L['code'] }}"></div><div class="col-md-2"><select name="status" class="form-select"><option value="Working">{{ L['working'] }}</option><option value="Maintenance">{{ L['maintenance'] }}</option><option value="Broken">{{ L['broken'] }}</option></select></div><div class="col-md-8"><input name="notes" class="form-control" placeholder="{{ L['notes'] }}"></div><div class="col-md-4"><button class="btn btn-success w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div></form><hr class="my-4"><h5 class="mb-3 text-info"><i class="fas fa-file-excel"></i> رفع مجموعة طابعات (ملف CSV)</h5><form action="/upload_csv" method="POST" enctype="multipart/form-data" class="row g-3 align-items-center"><div class="col-md-6"><input type="file" name="csv_file" class="form-control" accept=".csv" required></div><div class="col-md-3"><button type="submit" class="btn btn-info text-white w-100"><i class="fas fa-upload"></i> رفع الملف</button></div><div class="col-12"><small class="text-muted">تنبيه: يجب أن يحتوي الملف على 6 أعمدة بالترتيب (الاسم، السيريال، القسم، الحالة، الرمز، الملاحظات). السطر الأول سيتم تجاهله.</small></div></form></div>{% endif %}<div class="card overflow-hidden shadow-sm"><table class="table table-hover align-middle mb-0"><thead class="table-dark"><tr><th>{{ L['code'] }}</th><th>{{ L['name'] }}</th><th>{{ L['serial'] }}</th><th>{{ L['dept'] }}</th><th>{{ L['status'] }}</th><th>{{ L['notes'] }}</th>{% if session.get('role') in ['admin', 'entry'] %}<th>إجراءات</th>{% endif %}</tr></thead><tbody>{% for p in printers %}<tr><td><span class="badge bg-secondary">{{ p['code'] }}</span></td><td><strong>{{ p['name'] }}</strong></td><td><code>{{ p['serial'] }}</code></td><td>{{ p['department'] }}</td><td><span class="badge status-{{ p['status'] }} p-2">{{ L[p['status'].lower().replace(' ', '')] }}</span></td><td><small class="text-muted">{{ p['notes'] }}</small></td><td>{% if session.get('role') in ['admin', 'entry'] %}<a href="/edit/{{ p['id'] }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>{% endif %}{% if session.get('role') == 'admin' %}<a href="/delete/{{ p['id'] }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد؟')"><i class="fas fa-trash"></i></a>{% endif %}</td></tr>{% else %}<tr><td colspan="7" class="text-center py-4 text-muted">لا توجد بيانات لعرضها</td></tr>{% endfor %}</tbody></table></div>"""
-EDIT_UI = """<div class="row mb-4"><div class="col-12"><h3><i class="fas fa-edit text-primary"></i> {{ L['edit_printer'] }}</h3></div></div><div class="card p-4 border-0 shadow-sm bg-light"><form action="/edit/{{ printer['id'] }}" method="POST" class="row g-3"><div class="col-md-3"><label>{{ L['name'] }}</label><input name="name" class="form-control" value="{{ printer['name'] }}" required></div><div class="col-md-3"><label>{{ L['serial'] }}</label><input name="serial" class="form-control" value="{{ printer['serial'] }}" required></div><div class="col-md-3"><label>{{ L['dept'] }}</label><input name="dept" class="form-control" value="{{ printer['department'] }}"></div><div class="col-md-3"><label>{{ L['code'] }}</label><input name="code" class="form-control" value="{{ printer['code'] }}"></div><div class="col-md-4"><label>{{ L['status'] }}</label><select name="status" class="form-select"><option value="Working" {% if printer['status'] == 'Working' %}selected{% endif %}>{{ L['working'] }}</option><option value="Maintenance" {% if printer['status'] == 'Maintenance' %}selected{% endif %}>{{ L['maintenance'] }}</option><option value="Broken" {% if printer['status'] == 'Broken' %}selected{% endif %}>{{ L['broken'] }}</option></select></div><div class="col-md-8"><label>{{ L['notes'] }}</label><input name="notes" class="form-control" value="{{ printer['notes'] }}"></div><div class="col-12 mt-4"><button class="btn btn-primary px-4"><i class="fas fa-save"></i> {{ L['save'] }}</button><a href="/" class="btn btn-secondary px-4">{{ L['home'] }}</a></div></form></div>"""
-REPORTS_UI = """<div class="row mb-4"><div class="col-12"><h3><i class="fas fa-chart-pie text-primary"></i> {{ L['reports'] }}</h3></div></div><div class="row g-4 text-center"><div class="col-md-12"><div class="card p-4 bg-white border-bottom border-primary border-4 shadow-sm"><h5 class="text-muted">{{ L['total'] }}</h5><h1 class="text-primary fw-bold display-4">{{ stats['total'] }}</h1></div></div><div class="col-md-4"><div class="card p-4 bg-white border-bottom border-success border-4 shadow-sm"><h5 class="text-muted">{{ L['working'] }}</h5><h2 class="text-success fw-bold">{{ stats['active'] }}</h2></div></div><div class="col-md-4"><div class="card p-4 bg-white border-bottom border-warning border-4 shadow-sm"><h5 class="text-muted">{{ L['maintenance'] }}</h5><h2 class="text-warning fw-bold">{{ stats['maint'] }}</h2></div></div><div class="col-md-4"><div class="card p-4 bg-white border-bottom border-danger border-4 shadow-sm"><h5 class="text-muted">{{ L['broken'] }}</h5><h2 class="text-danger fw-bold">{{ stats['broken'] }}</h2></div></div></div>"""
+{% if session.get('role') in ['admin', 'entry'] %}
+<div class="card p-4 mb-4 border-0 shadow-sm bg-light">
+    <h5 class="mb-3 text-primary"><i class="fas fa-plus-circle"></i> إضافة طابعة يدوياً</h5>
+    <form action="/add" method="POST" class="row g-3">
+        <div class="col-md-4"><input name="name" class="form-control" placeholder="{{ L['name'] }}" required></div>
+        <div class="col-md-2"><input name="serial" class="form-control" placeholder="{{ L['serial'] }}" required></div>
+        <div class="col-md-3"><input name="dept" class="form-control" placeholder="{{ L['dept'] }}"></div>
+        <div class="col-md-3"><input name="code" class="form-control" placeholder="{{ L['code'] }}"></div>
+        
+        <div class="col-md-3">
+            <select name="status" class="form-select">
+                <option value="Working">{{ L['working'] }}</option>
+                <option value="Maintenance">{{ L['maintenance'] }}</option>
+                <option value="Broken">{{ L['broken'] }}</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="color_type" class="form-select">
+                <option value="BW">{{ L['bw'] }}</option>
+                <option value="Color">{{ L['color'] }}</option>
+            </select>
+        </div>
+        <div class="col-md-4"><input name="notes" class="form-control" placeholder="{{ L['notes'] }}"></div>
+        <div class="col-md-2"><button class="btn btn-success w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div>
+    </form>
+    
+    <hr class="my-4">
+    <h5 class="mb-3 text-info"><i class="fas fa-file-excel"></i> رفع مجموعة طابعات (ملف CSV)</h5>
+    <form action="/upload_csv" method="POST" enctype="multipart/form-data" class="row g-3 align-items-center">
+        <div class="col-md-6">
+            <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-info text-white w-100"><i class="fas fa-upload"></i> رفع الملف</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+<div class="card shadow-sm table-scroll border-0">
+    <table class="table table-hover align-middle mb-0">
+        <thead>
+            <tr>
+                <th>{{ L['code'] }}</th><th>{{ L['name'] }}</th><th>{{ L['serial'] }}</th>
+                <th>{{ L['dept'] }}</th><th>{{ L['status'] }}</th><th>{{ L['color_type'] }}</th><th>{{ L['notes'] }}</th>
+                {% if session.get('role') in ['admin', 'entry'] %}<th>إجراءات</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in printers %}
+            <tr>
+                <td><span class="badge bg-secondary">{{ p['code'] }}</span></td>
+                <td><strong>{{ p['name'] }}</strong></td>
+                <td><code>{{ p['serial'] }}</code></td>
+                <td>{{ p['department'] }}</td>
+                <td><span class="badge status-{{ p['status'] }} p-2">{{ L[p['status'].lower().replace(' ', '')] }}</span></td>
+                <td><span class="badge bg-light text-dark border p-1"><i class="fas {% if p['color_type'] == 'Color' %}fa-palette text-primary{% else %}fa-print text-secondary{% endif %} me-1"></i>{{ L['color'] if p['color_type'] == 'Color' else L['bw'] }}</span></td>
+                <td><small class="text-muted">{{ p['notes'] }}</small></td>
+                <td>
+                    {% if session.get('role') in ['admin', 'entry'] %}
+                    <a href="/edit/{{ p['id'] }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
+                    {% endif %}
+                    {% if session.get('role') == 'admin' %}
+                    <a href="/delete/{{ p['id'] }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد؟')"><i class="fas fa-trash"></i></a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center py-5 text-muted"><i class="fas fa-folder-open fa-3x mb-3 text-light"></i><br>لا توجد بيانات لعرضها</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+"""
+
+EDIT_UI = """
+<div class="row mb-4">
+    <div class="col-12"><h3><i class="fas fa-edit text-primary"></i> {{ L['edit_printer'] }}</h3></div>
+</div>
+<div class="card p-4 border-0 shadow-sm bg-light">
+    <form action="/edit/{{ printer['id'] }}" method="POST" class="row g-3">
+        <div class="col-md-4"><label class="fw-bold">{{ L['name'] }}</label><input name="name" class="form-control" value="{{ printer['name'] }}" required></div>
+        <div class="col-md-3"><label class="fw-bold">{{ L['serial'] }}</label><input name="serial" class="form-control" value="{{ printer['serial'] }}" required></div>
+        <div class="col-md-3"><label class="fw-bold">{{ L['dept'] }}</label><input name="dept" class="form-control" value="{{ printer['department'] }}"></div>
+        <div class="col-md-2"><label class="fw-bold">{{ L['code'] }}</label><input name="code" class="form-control" value="{{ printer['code'] }}"></div>
+        
+        <div class="col-md-3">
+            <label class="fw-bold">{{ L['status'] }}</label>
+            <select name="status" class="form-select">
+                <option value="Working" {% if printer['status'] == 'Working' %}selected{% endif %}>{{ L['working'] }}</option>
+                <option value="Maintenance" {% if printer['status'] == 'Maintenance' %}selected{% endif %}>{{ L['maintenance'] }}</option>
+                <option value="Broken" {% if printer['status'] == 'Broken' %}selected{% endif %}>{{ L['broken'] }}</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="fw-bold">{{ L['color_type'] }}</label>
+            <select name="color_type" class="form-select">
+                <option value="BW" {% if printer['color_type'] == 'BW' %}selected{% endif %}>{{ L['bw'] }}</option>
+                <option value="Color" {% if printer['color_type'] == 'Color' %}selected{% endif %}>{{ L['color'] }}</option>
+            </select>
+        </div>
+        <div class="col-md-6"><label class="fw-bold">{{ L['notes'] }}</label><input name="notes" class="form-control" value="{{ printer['notes'] }}"></div>
+        
+        <div class="col-12 mt-4">
+            <button class="btn btn-primary px-4"><i class="fas fa-save"></i> {{ L['save'] }}</button>
+            <a href="/" class="btn btn-secondary px-4">{{ L['home'] }}</a>
+        </div>
+    </form>
+</div>
+"""
+
+# --- واجهة التقارير الجديدة والاحترافية ---
+REPORTS_UI = """
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .feature-card { transition: transform 0.3s; cursor: default; }
+    .feature-card:hover { transform: translateY(-5px); }
+</style>
+
+<div class="row mb-4">
+    <div class="col-12"><h3><i class="fas fa-chart-pie text-primary"></i> {{ L['reports'] }} (لوحة التحكم)</h3></div>
+</div>
+
+<div class="row g-4 text-center mb-5">
+    <div class="col-md-3">
+        <div class="card p-4 bg-white border-bottom border-primary border-4 shadow-sm h-100 feature-card">
+            <i class="fas fa-print fa-2x text-primary mb-2"></i>
+            <h5 class="text-muted">{{ L['total'] }}</h5>
+            <h2 class="text-primary fw-bold">{{ stats['total'] }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-4 bg-white border-bottom border-success border-4 shadow-sm h-100 feature-card">
+            <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+            <h5 class="text-muted">{{ L['working'] }}</h5>
+            <h2 class="text-success fw-bold">{{ stats['active'] }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-4 bg-white border-bottom border-warning border-4 shadow-sm h-100 feature-card">
+            <i class="fas fa-tools fa-2x text-warning mb-2"></i>
+            <h5 class="text-muted">{{ L['maintenance'] }}</h5>
+            <h2 class="text-warning fw-bold">{{ stats['maint'] }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-4 bg-white border-bottom border-danger border-4 shadow-sm h-100 feature-card">
+            <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
+            <h5 class="text-muted">{{ L['broken'] }}</h5>
+            <h2 class="text-danger fw-bold">{{ stats['broken'] }}</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card p-4 shadow-sm border-0 h-100">
+            <h5 class="text-center text-muted mb-4"><i class="fas fa-heartbeat me-2"></i>حالة الطابعات</h5>
+            <div style="height: 250px;">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card p-4 shadow-sm border-0 h-100">
+            <h5 class="text-center text-muted mb-4"><i class="fas fa-palette me-2"></i>نوع الطباعة</h5>
+            <div style="height: 250px;">
+                <canvas id="typeChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card p-4 shadow-sm border-0 h-100">
+            <h5 class="text-center text-muted mb-4"><i class="fas fa-building me-2"></i>توزيع الأقسام</h5>
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                <table class="table table-sm table-hover text-center align-middle">
+                    <thead class="table-light sticky-top">
+                        <tr><th class="text-start">القسم</th><th>العدد</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for dept in dept_stats %}
+                        <tr>
+                            <td class="text-start"><small class="fw-bold text-secondary">{{ dept['department'] }}</small></td>
+                            <td><span class="badge bg-primary rounded-pill">{{ dept['count'] }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="2" class="text-muted py-4">لا توجد بيانات للأقسام</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // إعدادات الرسم البياني لحالة الطابعات
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['{{ L["working"] }}', '{{ L["maintenance"] }}', '{{ L["broken"] }}'],
+            datasets: [{
+                data: [{{ stats['active'] }}, {{ stats['maint'] }}, {{ stats['broken'] }}],
+                backgroundColor: ['#198754', '#ffc107', '#dc3545'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+
+    // إعدادات الرسم البياني لنوع الطباعة
+    new Chart(document.getElementById('typeChart'), {
+        type: 'pie',
+        data: {
+            labels: ['{{ L["color"] }}', '{{ L["bw"] }}'],
+            datasets: [{
+                data: [{{ stats['color'] }}, {{ stats['bw'] }}],
+                backgroundColor: ['#0d6efd', '#6c757d'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+    });
+});
+</script>
+"""
+
 USERS_UI = """<div class="row mb-4"><div class="col-12"><h3><i class="fas fa-users text-primary"></i> {{ L['users_manage'] }}</h3></div></div><div class="card p-4 mb-4 border-0 shadow-sm bg-light"><form action="/add_user" method="POST" class="row g-3"><div class="col-md-3"><input name="username" class="form-control" placeholder="{{ L['username'] }}" required></div><div class="col-md-3"><input type="password" name="password" class="form-control" placeholder="{{ L['password'] }}" required></div><div class="col-md-3"><select name="role" class="form-select"><option value="admin">{{ L['admin'] }}</option><option value="entry">{{ L['entry'] }}</option><option value="user">{{ L['user'] }}</option></select></div><div class="col-md-3"><button class="btn btn-success w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div></form></div><div class="card overflow-hidden shadow-sm"><table class="table table-hover align-middle mb-0"><thead class="table-dark"><tr><th>{{ L['username'] }}</th><th>{{ L['role'] }}</th><th>{{ L['delete'] }}</th></tr></thead><tbody>{% for u in users %}<tr><td>{{ u['username'] }}</td><td>{{ L[u['role']] }}</td><td>{% if u['username'] != 'admin' %}<a href="/delete_user/{{ u['id'] }}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>{% endif %}</td></tr>{% endfor %}</tbody></table></div>"""
 
 # --- 5. وظائف قاعدة البيانات الدائمة (PostgreSQL) ---
 
 def get_db_connection():
-    if not DATABASE_URL:
-        return None
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
+    if not DATABASE_URL: return None
+    return psycopg2.connect(DATABASE_URL)
 
 def init_db():
-    if not DATABASE_URL:
-        print("DATABASE_URL is missing. Please set it in Render.")
-        return
-        
+    if not DATABASE_URL: return
     conn = get_db_connection()
     cur = conn.cursor()
-    
-    # إنشاء الجداول بأسلوب PostgreSQL
     cur.execute("""
         CREATE TABLE IF NOT EXISTS printers (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            serial TEXT UNIQUE,
-            department TEXT,
-            status TEXT,
-            code TEXT,
-            notes TEXT
+            id SERIAL PRIMARY KEY, name TEXT NOT NULL, serial TEXT UNIQUE, department TEXT,
+            status TEXT, code TEXT, notes TEXT, color_type TEXT DEFAULT 'BW'
         )
     """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE,
-            password TEXT,
-            role TEXT
-        )
-    """)
+    cur.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT UNIQUE, password TEXT, role TEXT)")
     
-    # إضافة الحقول إذا لم تكن موجودة
     cur.execute("ALTER TABLE printers ADD COLUMN IF NOT EXISTS code TEXT")
     cur.execute("ALTER TABLE printers ADD COLUMN IF NOT EXISTS notes TEXT")
+    cur.execute("ALTER TABLE printers ADD COLUMN IF NOT EXISTS color_type TEXT DEFAULT 'BW'")
     
-    # إضافة حساب المدير الافتراضي
     admin_pass = generate_password_hash('admin123')
-    cur.execute("""
-        INSERT INTO users (username, password, role) 
-        VALUES ('admin', %s, 'admin') 
-        ON CONFLICT (username) DO NOTHING
-    """, (admin_pass,))
+    cur.execute("INSERT INTO users (username, password, role) VALUES ('admin', %s, 'admin') ON CONFLICT (username) DO NOTHING", (admin_pass,))
     
     conn.commit()
     cur.close()
     conn.close()
 
-# تشغيل الإنشاء التلقائي
 init_db()
 
 # --- 6. الهيكل العام (Layout) ---
@@ -116,12 +339,18 @@ def render_ui(content_html, **context):
             .status-Working { background: #d4edda; color: #155724; }
             .status-Maintenance { background: #fff3cd; color: #856404; }
             .status-Broken { background: #f8d7da; color: #721c24; }
+            
+            .table-scroll { max-height: 60vh; overflow-y: auto; }
+            .table-scroll thead th { position: sticky; top: 0; background-color: #212529; color: #fff; z-index: 2; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4); }
+            
+            body { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
+            input, textarea { -webkit-user-select: text; -ms-user-select: text; user-select: text; }
         </style>
     </head>
-    <body>
-        <nav class="navbar navbar-expand-lg navbar-dark mb-4 p-3">
+    <body oncontextmenu="return false;">
+        <nav class="navbar navbar-expand-lg navbar-dark mb-4 p-3 shadow-sm">
             <div class="container">
-                <a class="navbar-brand" href="/">{{ L['title'] }}</a>
+                <a class="navbar-brand" href="/"><i class="fas fa-print me-2"></i> {{ L['title'] }}</a>
                 {% if session.get('user') %}
                 <div class="navbar-nav mx-auto">
                     <a class="nav-link" href="/">{{ L['home'] }}</a>
@@ -130,19 +359,32 @@ def render_ui(content_html, **context):
                 </div>
                 {% endif %}
                 <a href="/set_lang/{% if lang_code == 'ar' %}en{% else %}ar{% endif %}" class="btn btn-sm btn-outline-light">{% if lang_code == 'ar' %}English{% else %}العربية{% endif %}</a>
-                {% if session.get('user') %}<a href="/logout" class="btn btn-danger btn-sm ms-2"><i class="fas fa-sign-out-alt"></i></a>{% endif %}
+                {% if session.get('user') %}<a href="/logout" class="btn btn-danger btn-sm ms-3"><i class="fas fa-sign-out-alt"></i></a>{% endif %}
             </div>
         </nav>
         <div class="container">
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
                 {% for category, msg in messages %}
-                  <div class="alert alert-{{ 'success' if category == 'success' else 'warning' }}">{{ msg }}</div>
+                  <div class="alert alert-{{ 'success' if category == 'success' else 'warning' }} alert-dismissible fade show shadow-sm">
+                    {{ msg }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                  </div>
                 {% endfor %}
               {% endif %}
             {% endwith %}
             """ + content_html + """
         </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            document.onkeydown = function(e) {
+                if(event.keyCode == 123) { return false; }
+                if(e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) { return false; }
+                if(e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) { return false; }
+                if(e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) { return false; }
+                if(e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) { return false; }
+            }
+        </script>
     </body>
     </html>
     """
@@ -155,17 +397,11 @@ def index():
     if 'user' not in session: return redirect(url_for('login'))
     q = request.args.get('q', '')
     query_sql = f"%{q}%"
-    
     conn = get_db_connection()
     if not conn: return "Database Error"
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    
-    cur.execute("""
-        SELECT * FROM printers 
-        WHERE name ILIKE %s OR serial ILIKE %s OR department ILIKE %s OR code ILIKE %s OR notes ILIKE %s
-    """, (query_sql, query_sql, query_sql, query_sql, query_sql))
+    cur.execute("SELECT * FROM printers WHERE name ILIKE %s OR serial ILIKE %s OR department ILIKE %s OR code ILIKE %s OR notes ILIKE %s ORDER BY id DESC", (query_sql, query_sql, query_sql, query_sql, query_sql))
     printers = cur.fetchall()
-    
     cur.close()
     conn.close()
     return render_ui(DASHBOARD_UI, printers=printers, query=q)
@@ -173,38 +409,43 @@ def index():
 @app.route('/reports')
 def reports():
     if 'user' not in session: return redirect(url_for('login'))
-    
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     
+    # الإحصائيات الأساسية
     stats = {}
     cur.execute("SELECT COUNT(*) FROM printers")
     stats['total'] = cur.fetchone()[0]
-    
     cur.execute("SELECT COUNT(*) FROM printers WHERE status='Working'")
     stats['active'] = cur.fetchone()[0]
-    
     cur.execute("SELECT COUNT(*) FROM printers WHERE status='Maintenance'")
     stats['maint'] = cur.fetchone()[0]
-    
     cur.execute("SELECT COUNT(*) FROM printers WHERE status='Broken'")
     stats['broken'] = cur.fetchone()[0]
     
+    # إحصائيات نوع الطباعة
+    cur.execute("SELECT COUNT(*) FROM printers WHERE color_type='Color'")
+    stats['color'] = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM printers WHERE color_type='BW'")
+    stats['bw'] = cur.fetchone()[0]
+    
+    # إحصائيات الأقسام
+    cur.execute("SELECT department, COUNT(*) as count FROM printers WHERE department != '' GROUP BY department ORDER BY count DESC")
+    dept_stats = cur.fetchall()
+    
     cur.close()
     conn.close()
-    return render_ui(REPORTS_UI, stats=stats)
+    return render_ui(REPORTS_UI, stats=stats, dept_stats=dept_stats)
 
 @app.route('/users')
 def users():
     if session.get('role') != 'admin': return redirect(url_for('index'))
-    
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     cur.execute("SELECT * FROM users")
     users_list = cur.fetchall()
     cur.close()
     conn.close()
-    
     return render_ui(USERS_UI, users=users_list)
 
 @app.route('/add_user', methods=['POST'])
@@ -213,11 +454,9 @@ def add_user():
         conn = get_db_connection()
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO users (username, password, role) VALUES (%s,%s,%s)", 
-                        (request.form['username'], generate_password_hash(request.form['password']), request.form['role']))
+            cur.execute("INSERT INTO users (username, password, role) VALUES (%s,%s,%s)", (request.form['username'], generate_password_hash(request.form['password']), request.form['role']))
             conn.commit()
-        except Exception:
-            pass
+        except Exception: pass
         cur.close()
         conn.close()
     return redirect(url_for('users'))
@@ -242,15 +481,55 @@ def login():
         user = cur.fetchone()
         cur.close()
         conn.close()
-        
         if user and check_password_hash(user['password'], request.form['password']):
+            session.permanent = bool(request.form.get('remember'))
             session['user'] = user['username']
             session['role'] = user['role']
             return redirect(url_for('index'))
         flash("فشل الدخول: تأكد من اسم المستخدم أو كلمة المرور", "error")
     
     L = LANGS.get(session.get('lang', 'ar'), LANGS['ar'])
-    return render_ui(f'<div class="row justify-content-center"><div class="col-md-4 card p-4 mt-5 shadow"><h4 class="text-center mb-4">{L["login"]}</h4><form method="POST"><input name="username" class="form-control mb-3" placeholder="{L["username"]}"><input type="password" name="password" class="form-control mb-3" placeholder="{L["password"]}"><button class="btn btn-primary w-100">{L["login"]}</button></form></div></div>')
+    login_html = f"""
+    <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
+        <div class="col-md-5">
+            <div class="card p-5 shadow-lg border-0 rounded-4" style="background: linear-gradient(145deg, #ffffff, #f8f9fa);">
+                <div class="text-center mb-4">
+                    <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow" style="width: 80px; height: 80px;">
+                        <i class="fas fa-print fa-3x"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark">{L['title']}</h3>
+                    <p class="text-muted">الرجاء إدخال بيانات الاعتماد الخاصة بك</p>
+                </div>
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-secondary">{L['username']}</label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white text-primary border-end-0"><i class="fas fa-user"></i></span>
+                            <input name="username" class="form-control border-start-0" placeholder="{L['username']}" required>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-secondary">{L['password']}</label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white text-primary border-end-0"><i class="fas fa-lock"></i></span>
+                            <input type="password" name="password" class="form-control border-start-0" placeholder="{L['password']}" required>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="remember" id="remember" checked>
+                            <label class="form-check-label text-muted" for="remember">
+                                {L['remember']} (الاحتفاظ بتسجيل الدخول)
+                            </label>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary w-100 py-2 fs-5 rounded-3 shadow"><i class="fas fa-sign-in-alt me-2"></i> {L['login']}</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    """
+    return render_ui(login_html)
 
 @app.route('/add', methods=['POST'])
 def add():
@@ -258,8 +537,8 @@ def add():
         conn = get_db_connection()
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO printers (name, serial, department, status, code, notes) VALUES (%s,%s,%s,%s,%s,%s)", 
-                         (request.form['name'], request.form['serial'], request.form['dept'], request.form['status'], request.form.get('code', ''), request.form.get('notes', '')))
+            cur.execute("INSERT INTO printers (name, serial, department, status, code, color_type, notes) VALUES (%s,%s,%s,%s,%s,%s,%s)", 
+                         (request.form['name'], request.form['serial'], request.form['dept'], request.form['status'], request.form.get('code', ''), request.form.get('color_type', 'BW'), request.form.get('notes', '')))
             conn.commit()
             flash("تمت الإضافة بنجاح", "success")
         except:
@@ -276,41 +555,31 @@ def upload_csv():
     if not file or file.filename == '':
         flash("لم يتم اختيار أي ملف", "error")
         return redirect(url_for('index'))
-        
     if file and file.filename.endswith('.csv'):
         try:
             stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
             csv_input = csv.reader(stream)
             next(csv_input, None)
-            
             added_count = 0
             conn = get_db_connection()
             cur = conn.cursor()
-            
             for row in csv_input:
                 if len(row) >= 6:
                     name, serial, dept, status, code, notes = [str(x).strip() for x in row[:6]]
                     if status not in ['Working', 'Maintenance', 'Broken']: status = 'Working'
-                        
+                    color_type = 'BW'
                     if name and serial:
                         try:
-                            cur.execute("""
-                                INSERT INTO printers (name, serial, department, status, code, notes) 
-                                VALUES (%s,%s,%s,%s,%s,%s) 
-                                ON CONFLICT (serial) DO NOTHING
-                            """, (name, serial, dept, status, code, notes))
-                            if cur.rowcount > 0:
-                                added_count += 1
+                            cur.execute("INSERT INTO printers (name, serial, department, status, code, color_type, notes) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (serial) DO NOTHING", (name, serial, dept, status, code, color_type, notes))
+                            if cur.rowcount > 0: added_count += 1
                         except Exception as e:
                             conn.rollback()
             conn.commit()
             cur.close()
             conn.close()
             flash(f"تمت العملية! أُضيفت {added_count} طابعة بنجاح.", "success")
-        except Exception as e:
-            flash(f"حدث خطأ: {str(e)}", "error")
-    else:
-        flash("الرجاء رفع ملف بصيغة CSV فقط", "error")
+        except Exception as e: flash(f"حدث خطأ: {str(e)}", "error")
+    else: flash("الرجاء رفع ملف بصيغة CSV فقط", "error")
     return redirect(url_for('index'))
 
 @app.route('/edit/<int:pid>', methods=['GET', 'POST'])
@@ -318,11 +587,9 @@ def edit(pid):
     if session.get('role') not in ['admin', 'entry']: return redirect(url_for('index'))
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    
     if request.method == 'POST':
         try:
-            cur.execute("UPDATE printers SET name=%s, serial=%s, department=%s, status=%s, code=%s, notes=%s WHERE id=%s", 
-                         (request.form['name'], request.form['serial'], request.form['dept'], request.form['status'], request.form.get('code', ''), request.form.get('notes', ''), pid))
+            cur.execute("UPDATE printers SET name=%s, serial=%s, department=%s, status=%s, code=%s, color_type=%s, notes=%s WHERE id=%s", (request.form['name'], request.form['serial'], request.form['dept'], request.form['status'], request.form.get('code', ''), request.form.get('color_type', 'BW'), request.form.get('notes', ''), pid))
             conn.commit()
             flash("تم التعديل بنجاح", "success")
         except:
@@ -331,7 +598,6 @@ def edit(pid):
         cur.close()
         conn.close()
         return redirect(url_for('index'))
-        
     cur.execute("SELECT * FROM printers WHERE id=%s", (pid,))
     printer = cur.fetchone()
     cur.close()
@@ -361,4 +627,4 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)
