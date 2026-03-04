@@ -15,8 +15,8 @@ app.permanent_session_lifetime = timedelta(days=30)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# --- إعدادات السيرفر (جاهزة للرفع) ---
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# --- إعدادات السيرفر ---
+DATABASE_URL = os.environ.get('DATABASE_URL') # يمكنك تغييره للرابط الطويل عند التجربة المحلية
 # ------------------------------------
 
 # --- دروع الأمان (Security Headers) ---
@@ -45,7 +45,12 @@ LANGS = {
         'no_data': 'لا توجد بيانات لعرضها', 'export_excel': 'تصدير (Excel)', 'dashboard_title': '(لوحة التحكم)',
         'printers_status': 'حالة الطابعات', 'print_type_chart': 'نوع الطباعة', 'dept_dist': 'توزيع الأقسام',
         'count': 'العدد', 'no_dept_data': 'لا توجد بيانات للأقسام', 'login_desc': 'الرجاء إدخال بيانات الاعتماد الخاصة بك',
-        'keep_login': '(الاحتفاظ بتسجيل الدخول)'
+        'keep_login': '(الاحتفاظ بتسجيل الدخول)', 'confirm_delete_title': 'تأكيد الحذف',
+        'confirm_delete_msg': 'هل أنت متأكد من حذف هذه الطابعة نهائياً؟', 'cancel': 'إلغاء', 'yes_delete': 'نعم، احذفها',
+        'seq': 'ت', 'err_username': 'اسم المستخدم غير صحيح!', 'err_password': 'كلمة المرور غير صحيحة!',
+        'forgot_pass': 'نسيت كلمة المرور؟', 'contact_admin': 'الرجاء مراجعة مدير النظام (Admin) لإعادة تعيين كلمة المرور الخاصة بك.',
+        'edit_pass': 'تغيير كلمة المرور', 'new_pass': 'كلمة المرور الجديدة', 'pass_changed': 'تم تغيير كلمة المرور بنجاح!',
+        'admin_notice': 'تنبيه إداري', 'edit_role': 'تعديل الصلاحية', 'new_role': 'الصلاحية', 'role_changed': 'تم تعديل الصلاحية بنجاح!'
     },
     'en': {
         'title': 'Printer System', 'home': 'Home', 'reports': 'Reports', 'users_manage': 'Manage Users',
@@ -62,68 +67,76 @@ LANGS = {
         'no_data': 'No data to display', 'export_excel': 'Export (Excel)', 'dashboard_title': '(Dashboard)',
         'printers_status': 'Printers Status', 'print_type_chart': 'Print Type', 'dept_dist': 'Departments Distribution',
         'count': 'Count', 'no_dept_data': 'No department data', 'login_desc': 'Please enter your credentials',
-        'keep_login': '(Keep me logged in)'
+        'keep_login': '(Keep me logged in)', 'confirm_delete_title': 'Confirm Deletion',
+        'confirm_delete_msg': 'Are you sure you want to permanently delete this printer?', 'cancel': 'Cancel', 'yes_delete': 'Yes, delete it',
+        'seq': '#', 'err_username': 'Incorrect username!', 'err_password': 'Incorrect password!',
+        'forgot_pass': 'Forgot Password?', 'contact_admin': 'Please contact the system administrator to reset your password.',
+        'edit_pass': 'Change Password', 'new_pass': 'New Password', 'pass_changed': 'Password changed successfully!',
+        'admin_notice': 'System Notice', 'edit_role': 'Edit Role', 'new_role': 'Role', 'role_changed': 'Role changed successfully!'
     }
 }
 
 # --- 4. واجهات العرض (HTML) ---
 DASHBOARD_UI = """
-<div class="row mb-4">
-    <div class="col-md-4"><h3><i class="fas fa-list text-primary"></i> {{ L['home'] }}</h3></div>
-    <div class="col-md-8 text-end">
-        <form action="/" method="GET" class="d-flex justify-content-end">
-            <input name="q" class="form-control me-2 shadow-sm w-50" placeholder="{{ L['search'] }}" value="{{ query }}">
-            <button class="btn btn-primary shadow-sm me-2"><i class="fas fa-search"></i></button>
-            {% if session.get('role') in ['admin', 'entry'] %}
-            <a href="/export_csv" class="btn btn-success shadow-sm text-nowrap"><i class="fas fa-file-excel"></i> {{ L['export_excel'] }}</a>
-            {% endif %}
+<div class="top-section">
+    <div class="row mb-3 align-items-center">
+        <div class="col-md-4"><h3><i class="fas fa-list text-primary"></i> {{ L['home'] }}</h3></div>
+        <div class="col-md-8 text-end">
+            <form action="/" method="GET" class="d-flex justify-content-end">
+                <input name="q" class="form-control me-2 shadow-sm w-50" placeholder="{{ L['search'] }}" value="{{ query }}">
+                <button class="btn btn-primary shadow-sm me-2"><i class="fas fa-search"></i></button>
+                {% if session.get('role') in ['admin', 'entry'] %}
+                <a href="/export_csv" class="btn btn-success shadow-sm text-nowrap"><i class="fas fa-file-excel"></i> {{ L['export_excel'] }}</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    {% if session.get('role') in ['admin', 'entry'] %}
+    <div class="card p-3 mb-3 border-0 shadow-sm bg-light">
+        <h5 class="mb-3 text-primary"><i class="fas fa-plus-circle"></i> {{ L['add_manual'] }}</h5>
+        <form action="/add" method="POST" class="row g-2">
+            <div class="col-md-4"><input name="name" class="form-control" placeholder="{{ L['name'] }}" required></div>
+            <div class="col-md-2"><input name="serial" class="form-control" placeholder="{{ L['serial'] }}" required></div>
+            <div class="col-md-3"><input name="dept" class="form-control" placeholder="{{ L['dept'] }}"></div>
+            <div class="col-md-3"><input name="code" class="form-control" placeholder="{{ L['code'] }}"></div>
+            
+            <div class="col-md-3">
+                <select name="status" class="form-select">
+                    <option value="Working">{{ L['working'] }}</option>
+                    <option value="Maintenance">{{ L['maintenance'] }}</option>
+                    <option value="Broken">{{ L['broken'] }}</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="color_type" class="form-select">
+                    <option value="BW">{{ L['bw'] }}</option>
+                    <option value="Color">{{ L['color'] }}</option>
+                </select>
+            </div>
+            <div class="col-md-4"><input name="notes" class="form-control" placeholder="{{ L['notes'] }}"></div>
+            <div class="col-md-2"><button class="btn btn-primary w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div>
+        </form>
+        
+        <hr class="my-3">
+        <h5 class="mb-2 text-info"><i class="fas fa-upload"></i> {{ L['upload_csv_title'] }}</h5>
+        <form action="/upload_csv" method="POST" enctype="multipart/form-data" class="row g-2 align-items-center">
+            <div class="col-md-6">
+                <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-info text-white w-100"><i class="fas fa-cloud-upload-alt"></i> {{ L['upload_btn'] }}</button>
+            </div>
         </form>
     </div>
+    {% endif %}
 </div>
-
-{% if session.get('role') in ['admin', 'entry'] %}
-<div class="card p-4 mb-4 border-0 shadow-sm bg-light">
-    <h5 class="mb-3 text-primary"><i class="fas fa-plus-circle"></i> {{ L['add_manual'] }}</h5>
-    <form action="/add" method="POST" class="row g-3">
-        <div class="col-md-4"><input name="name" class="form-control" placeholder="{{ L['name'] }}" required></div>
-        <div class="col-md-2"><input name="serial" class="form-control" placeholder="{{ L['serial'] }}" required></div>
-        <div class="col-md-3"><input name="dept" class="form-control" placeholder="{{ L['dept'] }}"></div>
-        <div class="col-md-3"><input name="code" class="form-control" placeholder="{{ L['code'] }}"></div>
-        
-        <div class="col-md-3">
-            <select name="status" class="form-select">
-                <option value="Working">{{ L['working'] }}</option>
-                <option value="Maintenance">{{ L['maintenance'] }}</option>
-                <option value="Broken">{{ L['broken'] }}</option>
-            </select>
-        </div>
-        <div class="col-md-3">
-            <select name="color_type" class="form-select">
-                <option value="BW">{{ L['bw'] }}</option>
-                <option value="Color">{{ L['color'] }}</option>
-            </select>
-        </div>
-        <div class="col-md-4"><input name="notes" class="form-control" placeholder="{{ L['notes'] }}"></div>
-        <div class="col-md-2"><button class="btn btn-primary w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div>
-    </form>
-    
-    <hr class="my-4">
-    <h5 class="mb-3 text-info"><i class="fas fa-upload"></i> {{ L['upload_csv_title'] }}</h5>
-    <form action="/upload_csv" method="POST" enctype="multipart/form-data" class="row g-3 align-items-center">
-        <div class="col-md-6">
-            <input type="file" name="csv_file" class="form-control" accept=".csv" required>
-        </div>
-        <div class="col-md-3">
-            <button type="submit" class="btn btn-info text-white w-100"><i class="fas fa-cloud-upload-alt"></i> {{ L['upload_btn'] }}</button>
-        </div>
-    </form>
-</div>
-{% endif %}
 
 <div class="card shadow-sm table-scroll border-0">
     <table class="table table-hover align-middle mb-0">
         <thead>
             <tr>
+                <th>{{ L['seq'] }}</th>
                 <th>{{ L['code'] }}</th><th>{{ L['name'] }}</th><th>{{ L['serial'] }}</th>
                 <th>{{ L['dept'] }}</th><th>{{ L['status'] }}</th><th>{{ L['color_type'] }}</th><th>{{ L['notes'] }}</th>
                 {% if session.get('role') in ['admin', 'entry'] %}<th>{{ L['actions'] }}</th>{% endif %}
@@ -132,6 +145,7 @@ DASHBOARD_UI = """
         <tbody>
             {% for p in printers %}
             <tr>
+                <td><strong>{{ loop.index }}</strong></td>
                 <td><span class="badge bg-secondary">{{ p['code'] }}</span></td>
                 <td><strong>{{ p['name'] }}</strong></td>
                 <td><code>{{ p['serial'] }}</code></td>
@@ -144,23 +158,52 @@ DASHBOARD_UI = """
                     <a href="/edit/{{ p['id'] }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i></a>
                     {% endif %}
                     {% if session.get('role') == 'admin' %}
-                    <a href="/delete/{{ p['id'] }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('{{ L['confirm_delete'] }}')"><i class="fas fa-trash"></i></a>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteModal({{ p['id'] }})"><i class="fas fa-trash"></i></button>
                     {% endif %}
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="8" class="text-center py-5 text-muted"><i class="fas fa-folder-open fa-3x mb-3 text-light"></i><br>{{ L['no_data'] }}</td></tr>
+            <tr><td colspan="9" class="text-center py-5 text-muted"><i class="fas fa-folder-open fa-3x mb-3 text-light"></i><br>{{ L['no_data'] }}</td></tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header bg-danger text-white border-0 rounded-top-4">
+        <h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>{{ L['confirm_delete_title'] }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center py-5">
+        <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style="width: 80px; height: 80px;">
+            <i class="fas fa-trash-alt fa-3x text-danger"></i>
+        </div>
+        <p class="fs-5 mb-0 text-dark">{{ L['confirm_delete_msg'] }}</p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center bg-light rounded-bottom-4 py-3">
+        <button type="button" class="btn btn-secondary px-4 shadow-sm" data-bs-dismiss="modal">{{ L['cancel'] }}</button>
+        <a href="#" id="confirmDeleteBtn" class="btn btn-danger px-4 shadow-sm"><i class="fas fa-trash me-1"></i> {{ L['yes_delete'] }}</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function showDeleteModal(printerId) {
+    document.getElementById('confirmDeleteBtn').href = '/delete/' + printerId;
+    var myModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    myModal.show();
+}
+</script>
 """
 
 EDIT_UI = """
+<div class="scrollable-page">
 <div class="row mb-4">
     <div class="col-12"><h3><i class="fas fa-edit text-primary"></i> {{ L['edit_printer'] }}</h3></div>
 </div>
-<div class="card p-4 border-0 shadow-sm bg-light">
+<div class="card p-4 border-0 shadow-sm bg-light mb-4">
     <form action="/edit/{{ printer['id'] }}" method="POST" class="row g-3">
         <div class="col-md-4"><label class="fw-bold">{{ L['name'] }}</label><input name="name" class="form-control" value="{{ printer['name'] }}" required></div>
         <div class="col-md-3"><label class="fw-bold">{{ L['serial'] }}</label><input name="serial" class="form-control" value="{{ printer['serial'] }}" required></div>
@@ -190,127 +233,80 @@ EDIT_UI = """
         </div>
     </form>
 </div>
+</div>
 """
 
 REPORTS_UI = """
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-    .feature-card { transition: transform 0.3s; cursor: default; }
-    .feature-card:hover { transform: translateY(-5px); }
-</style>
-
-<div class="row mb-4">
-    <div class="col-12"><h3><i class="fas fa-chart-pie text-primary"></i> {{ L['reports'] }} {{ L['dashboard_title'] }}</h3></div>
-</div>
-
+<style>.feature-card { transition: transform 0.3s; cursor: default; } .feature-card:hover { transform: translateY(-5px); }</style>
+<div class="scrollable-page">
+<div class="row mb-4"><div class="col-12"><h3><i class="fas fa-chart-pie text-primary"></i> {{ L['reports'] }} {{ L['dashboard_title'] }}</h3></div></div>
 <div class="row g-4 text-center mb-5">
-    <div class="col-md-3">
-        <div class="card p-4 bg-white border-bottom border-primary border-4 shadow-sm h-100 feature-card">
-            <i class="fas fa-print fa-2x text-primary mb-2"></i>
-            <h5 class="text-muted">{{ L['total'] }}</h5>
-            <h2 class="text-primary fw-bold">{{ stats['total'] }}</h2>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-4 bg-white border-bottom border-success border-4 shadow-sm h-100 feature-card">
-            <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-            <h5 class="text-muted">{{ L['working'] }}</h5>
-            <h2 class="text-success fw-bold">{{ stats['active'] }}</h2>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-4 bg-white border-bottom border-warning border-4 shadow-sm h-100 feature-card">
-            <i class="fas fa-tools fa-2x text-warning mb-2"></i>
-            <h5 class="text-muted">{{ L['maintenance'] }}</h5>
-            <h2 class="text-warning fw-bold">{{ stats['maint'] }}</h2>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card p-4 bg-white border-bottom border-danger border-4 shadow-sm h-100 feature-card">
-            <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
-            <h5 class="text-muted">{{ L['broken'] }}</h5>
-            <h2 class="text-danger fw-bold">{{ stats['broken'] }}</h2>
-        </div>
-    </div>
+    <div class="col-md-3"><div class="card p-4 bg-white border-bottom border-primary border-4 shadow-sm h-100 feature-card"><i class="fas fa-print fa-2x text-primary mb-2"></i><h5 class="text-muted">{{ L['total'] }}</h5><h2 class="text-primary fw-bold">{{ stats['total'] }}</h2></div></div>
+    <div class="col-md-3"><div class="card p-4 bg-white border-bottom border-success border-4 shadow-sm h-100 feature-card"><i class="fas fa-check-circle fa-2x text-success mb-2"></i><h5 class="text-muted">{{ L['working'] }}</h5><h2 class="text-success fw-bold">{{ stats['active'] }}</h2></div></div>
+    <div class="col-md-3"><div class="card p-4 bg-white border-bottom border-warning border-4 shadow-sm h-100 feature-card"><i class="fas fa-tools fa-2x text-warning mb-2"></i><h5 class="text-muted">{{ L['maintenance'] }}</h5><h2 class="text-warning fw-bold">{{ stats['maint'] }}</h2></div></div>
+    <div class="col-md-3"><div class="card p-4 bg-white border-bottom border-danger border-4 shadow-sm h-100 feature-card"><i class="fas fa-times-circle fa-2x text-danger mb-2"></i><h5 class="text-muted">{{ L['broken'] }}</h5><h2 class="text-danger fw-bold">{{ stats['broken'] }}</h2></div></div>
 </div>
-
 <div class="row g-4 mb-4">
-    <div class="col-md-4">
-        <div class="card p-4 shadow-sm border-0 h-100">
-            <h5 class="text-center text-muted mb-4"><i class="fas fa-heartbeat me-2"></i>{{ L['printers_status'] }}</h5>
-            <div style="height: 250px;">
-                <canvas id="statusChart"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card p-4 shadow-sm border-0 h-100">
-            <h5 class="text-center text-muted mb-4"><i class="fas fa-palette me-2"></i>{{ L['print_type_chart'] }}</h5>
-            <div style="height: 250px;">
-                <canvas id="typeChart"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card p-4 shadow-sm border-0 h-100">
-            <h5 class="text-center text-muted mb-4"><i class="fas fa-building me-2"></i>{{ L['dept_dist'] }}</h5>
-            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
-                <table class="table table-sm table-hover text-center align-middle">
-                    <thead class="table-light sticky-top">
-                        <tr><th class="text-start">{{ L['dept'] }}</th><th>{{ L['count'] }}</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for dept in dept_stats %}
-                        <tr>
-                            <td class="text-start"><small class="fw-bold text-secondary">{{ dept['department'] }}</small></td>
-                            <td><span class="badge bg-primary rounded-pill">{{ dept['count'] }}</span></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="2" class="text-muted py-4">{{ L['no_dept_data'] }}</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+    <div class="col-md-4"><div class="card p-4 shadow-sm border-0 h-100"><h5 class="text-center text-muted mb-4"><i class="fas fa-heartbeat me-2"></i>{{ L['printers_status'] }}</h5><div style="height: 250px;"><canvas id="statusChart"></canvas></div></div></div>
+    <div class="col-md-4"><div class="card p-4 shadow-sm border-0 h-100"><h5 class="text-center text-muted mb-4"><i class="fas fa-palette me-2"></i>{{ L['print_type_chart'] }}</h5><div style="height: 250px;"><canvas id="typeChart"></canvas></div></div></div>
+    <div class="col-md-4"><div class="card p-4 shadow-sm border-0 h-100"><h5 class="text-center text-muted mb-4"><i class="fas fa-building me-2"></i>{{ L['dept_dist'] }}</h5><div class="table-responsive" style="max-height: 250px; overflow-y: auto;"><table class="table table-sm table-hover text-center align-middle"><thead class="table-light sticky-top"><tr><th class="text-start">{{ L['dept'] }}</th><th>{{ L['count'] }}</th></tr></thead><tbody>{% for dept in dept_stats %}<tr><td class="text-start"><small class="fw-bold text-secondary">{{ dept['department'] }}</small></td><td><span class="badge bg-primary rounded-pill">{{ dept['count'] }}</span></td></tr>{% else %}<tr><td colspan="2" class="text-muted py-4">{{ L['no_dept_data'] }}</td></tr>{% endfor %}</tbody></table></div></div></div>
 </div>
-
+</div>
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    new Chart(document.getElementById('statusChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['{{ L["working"] }}', '{{ L["maintenance"] }}', '{{ L["broken"] }}'],
-            datasets: [{
-                data: [{{ stats['active'] }}, {{ stats['maint'] }}, {{ stats['broken'] }}],
-                backgroundColor: ['#198754', '#ffc107', '#dc3545'],
-                borderWidth: 0,
-                hoverOffset: 4
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-    });
-
-    new Chart(document.getElementById('typeChart'), {
-        type: 'pie',
-        data: {
-            labels: ['{{ L["color"] }}', '{{ L["bw"] }}'],
-            datasets: [{
-                data: [{{ stats['color'] }}, {{ stats['bw'] }}],
-                backgroundColor: ['#0d6efd', '#6c757d'],
-                borderWidth: 0,
-                hoverOffset: 4
-            }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-    });
+    new Chart(document.getElementById('statusChart'), { type: 'doughnut', data: { labels: ['{{ L["working"] }}', '{{ L["maintenance"] }}', '{{ L["broken"] }}'], datasets: [{ data: [{{ stats['active'] }}, {{ stats['maint'] }}, {{ stats['broken'] }}], backgroundColor: ['#198754', '#ffc107', '#dc3545'], borderWidth: 0, hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+    new Chart(document.getElementById('typeChart'), { type: 'pie', data: { labels: ['{{ L["color"] }}', '{{ L["bw"] }}'], datasets: [{ data: [{{ stats['color'] }}, {{ stats['bw'] }}], backgroundColor: ['#0d6efd', '#6c757d'], borderWidth: 0, hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
 });
 </script>
 """
 
-USERS_UI = """<div class="row mb-4"><div class="col-12"><h3><i class="fas fa-users text-primary"></i> {{ L['users_manage'] }}</h3></div></div><div class="card p-4 mb-4 border-0 shadow-sm bg-light"><form action="/add_user" method="POST" class="row g-3"><div class="col-md-3"><input name="username" class="form-control" placeholder="{{ L['username'] }}" required></div><div class="col-md-3"><input type="password" name="password" class="form-control" placeholder="{{ L['password'] }}" required></div><div class="col-md-3"><select name="role" class="form-select"><option value="admin">{{ L['admin'] }}</option><option value="entry">{{ L['entry'] }}</option><option value="user">{{ L['user'] }}</option></select></div><div class="col-md-3"><button class="btn btn-success w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div></form></div><div class="card overflow-hidden shadow-sm"><table class="table table-hover align-middle mb-0"><thead class="table-dark"><tr><th>{{ L['username'] }}</th><th>{{ L['role'] }}</th><th>{{ L['delete'] }}</th></tr></thead><tbody>{% for u in users %}<tr><td>{{ u['username'] }}</td><td>{{ L[u['role']] }}</td><td>{% if u['username'] != 'admin' %}<a href="/delete_user/{{ u['id'] }}" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></a>{% endif %}</td></tr>{% endfor %}</tbody></table></div>"""
+# أضفت زر تعديل الصلاحية للمستخدمين ونافذة منبثقة له
+USERS_UI = """<div class="scrollable-page"><div class="row mb-4"><div class="col-12"><h3><i class="fas fa-users text-primary"></i> {{ L['users_manage'] }}</h3></div></div><div class="card p-4 mb-4 border-0 shadow-sm bg-light"><form action="/add_user" method="POST" class="row g-3"><div class="col-md-3"><input name="username" class="form-control" placeholder="{{ L['username'] }}" required autocomplete="off"></div><div class="col-md-3"><input type="password" name="password" class="form-control" placeholder="{{ L['password'] }}" required autocomplete="new-password"></div><div class="col-md-3"><select name="role" class="form-select"><option value="admin">{{ L['admin'] }}</option><option value="entry">{{ L['entry'] }}</option><option value="user">{{ L['user'] }}</option></select></div><div class="col-md-3"><button class="btn btn-success w-100"><i class="fas fa-plus"></i> {{ L['add'] }}</button></div></form></div><div class="card overflow-hidden shadow-sm mb-4"><table class="table table-hover align-middle mb-0"><thead class="table-dark"><tr><th>{{ L['username'] }}</th><th>{{ L['role'] }}</th><th>{{ L['actions'] }}</th></tr></thead><tbody>{% for u in users %}<tr><td>{{ u['username'] }}</td><td><span class="badge bg-secondary">{{ L[u['role']] }}</span></td><td>
+<button type="button" class="btn btn-sm btn-outline-primary me-1" onclick="showEditPassModal({{ u['id'] }}, '{{ u['username'] }}')" title="{{ L['edit_pass'] }}"><i class="fas fa-key"></i></button>
+{% if u['username'] != 'admin' %}
+<button type="button" class="btn btn-sm btn-outline-warning me-1" onclick="showEditRoleModal({{ u['id'] }}, '{{ u['username'] }}', '{{ u['role'] }}')" title="{{ L['edit_role'] }}"><i class="fas fa-user-tag"></i></button>
+<button type="button" class="btn btn-sm btn-outline-danger" onclick="showDeleteModal({{ u['id'] }})"><i class="fas fa-trash"></i></button>
+{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
+
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-4"><div class="modal-header bg-danger text-white border-0 rounded-top-4"><h5 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>تأكيد الحذف</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body text-center py-5"><div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style="width: 80px; height: 80px;"><i class="fas fa-trash-alt fa-3x text-danger"></i></div><p class="fs-5 mb-0 text-dark">هل أنت متأكد من الحذف؟</p></div><div class="modal-footer border-0 justify-content-center bg-light rounded-bottom-4 py-3"><button type="button" class="btn btn-secondary px-4 shadow-sm" data-bs-dismiss="modal">{{ L['cancel'] }}</button><a href="#" id="confirmDeleteBtn" class="btn btn-danger px-4 shadow-sm"><i class="fas fa-trash me-1"></i> {{ L['yes_delete'] }}</a></div></div></div></div>
+
+<div class="modal fade" id="editPassModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow-lg rounded-4"><div class="modal-header bg-primary text-white border-0 rounded-top-4"><h5 class="modal-title fw-bold"><i class="fas fa-key me-2"></i>{{ L['edit_pass'] }} - <span id="editPassUsername"></span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div><form action="/edit_user_password" method="POST"><div class="modal-body py-4"><input type="hidden" name="user_id" id="editPassUserId"><div class="mb-3"><label class="form-label fw-bold">{{ L['new_pass'] }}</label><input type="password" name="new_password" class="form-control" required autocomplete="new-password"></div></div><div class="modal-footer border-0 justify-content-center bg-light rounded-bottom-4 py-3"><button type="button" class="btn btn-secondary px-4 shadow-sm" data-bs-dismiss="modal">{{ L['cancel'] }}</button><button type="submit" class="btn btn-primary px-4 shadow-sm"><i class="fas fa-save me-1"></i> {{ L['save'] }}</button></div></form></div></div></div>
+
+<div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header bg-warning text-dark border-0 rounded-top-4">
+        <h5 class="modal-title fw-bold"><i class="fas fa-user-tag me-2"></i>{{ L['edit_role'] }} - <span id="editRoleUsername"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/edit_user_role" method="POST">
+          <div class="modal-body py-4">
+            <input type="hidden" name="user_id" id="editRoleUserId">
+            <div class="mb-3">
+                <label class="form-label fw-bold">{{ L['new_role'] }}</label>
+                <select name="new_role" id="editRoleSelect" class="form-select">
+                    <option value="admin">{{ L['admin'] }}</option>
+                    <option value="entry">{{ L['entry'] }}</option>
+                    <option value="user">{{ L['user'] }}</option>
+                </select>
+            </div>
+          </div>
+          <div class="modal-footer border-0 justify-content-center bg-light rounded-bottom-4 py-3">
+            <button type="button" class="btn btn-secondary px-4 shadow-sm" data-bs-dismiss="modal">{{ L['cancel'] }}</button>
+            <button type="submit" class="btn btn-warning px-4 shadow-sm"><i class="fas fa-save me-1"></i> {{ L['save'] }}</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showDeleteModal(userId) { document.getElementById('confirmDeleteBtn').href = '/delete_user/' + userId; var myModal = new bootstrap.Modal(document.getElementById('deleteModal')); myModal.show(); }
+function showEditPassModal(userId, username) { document.getElementById('editPassUserId').value = userId; document.getElementById('editPassUsername').innerText = username; var myModal = new bootstrap.Modal(document.getElementById('editPassModal')); myModal.show(); }
+function showEditRoleModal(userId, username, currentRole) { document.getElementById('editRoleUserId').value = userId; document.getElementById('editRoleUsername').innerText = username; document.getElementById('editRoleSelect').value = currentRole; var myModal = new bootstrap.Modal(document.getElementById('editRoleModal')); myModal.show(); }
+</script>
+"""
 
 # --- 5. وظائف قاعدة البيانات الدائمة (PostgreSQL) ---
 
@@ -353,25 +349,40 @@ def render_ui(content_html, **context):
     <html lang="{{ lang_code }}" dir="{{ 'rtl' if lang_code == 'ar' else 'ltr' }}">
     <head>
         <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{{ L['title'] }}</title>
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap{% if lang_code == 'ar' %}.rtl{% endif %}.min.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
         <style>
-            body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma; }
-            .navbar { background: #1a237e; }
+            body, html { height: 100vh; overflow: hidden; margin: 0; }
+            body { background: #f8f9fa; font-family: 'Segoe UI', Tahoma; display: flex; flex-direction: column; }
+            
+            .navbar { flex-shrink: 0; background: #1a237e; }
+            .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 15px; }
+            
+            .top-section { flex-shrink: 0; max-height: 45vh; overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
+            .top-section::-webkit-scrollbar { width: 5px; }
+            .top-section::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+            
+            .table-scroll { flex: 1; overflow-y: auto; border-radius: 8px; background: #fff; }
+            .table-scroll thead th { position: sticky; top: 0; background-color: #212529; color: #fff; z-index: 2; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4); }
+            .table-scroll::-webkit-scrollbar { width: 8px; }
+            .table-scroll::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 4px; }
+            
+            .scrollable-page { flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
+            .scrollable-page::-webkit-scrollbar { width: 6px; }
+            .scrollable-page::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+
             .status-Working { background: #d4edda; color: #155724; }
             .status-Maintenance { background: #fff3cd; color: #856404; }
             .status-Broken { background: #f8d7da; color: #721c24; }
-            
-            .table-scroll { max-height: 60vh; overflow-y: auto; }
-            .table-scroll thead th { position: sticky; top: 0; background-color: #212529; color: #fff; z-index: 2; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4); }
             
             body { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
             input, textarea { -webkit-user-select: text; -ms-user-select: text; user-select: text; }
         </style>
     </head>
     <body oncontextmenu="return false;">
-        <nav class="navbar navbar-expand-lg navbar-dark mb-4 p-3 shadow-sm">
+        <nav class="navbar navbar-expand-lg navbar-dark mb-3 p-3 shadow-sm">
             <div class="container">
                 <a class="navbar-brand" href="/"><i class="fas fa-print me-2"></i> {{ L['title'] }}</a>
                 {% if session.get('user') %}
@@ -385,17 +396,19 @@ def render_ui(content_html, **context):
                 {% if session.get('user') %}<a href="/logout" class="btn btn-danger btn-sm ms-3"><i class="fas fa-sign-out-alt"></i></a>{% endif %}
             </div>
         </nav>
-        <div class="container">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-              {% if messages %}
-                {% for category, msg in messages %}
-                  <div class="alert alert-{{ 'success' if category == 'success' else 'warning' }} alert-dismissible fade show shadow-sm">
-                    {{ msg }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                  </div>
-                {% endfor %}
-              {% endif %}
-            {% endwith %}
+        <div class="container main-wrapper">
+            <div class="flex-shrink-0">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    {% for category, msg in messages %}
+                      <div class="alert alert-{{ 'success' if category == 'success' else 'warning' }} alert-dismissible fade show shadow-sm">
+                        {{ msg }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                {% endwith %}
+            </div>
             """ + content_html + """
         </div>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -462,7 +475,7 @@ def users():
     if session.get('role') != 'admin': return redirect(url_for('index'))
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM users")
+    cur.execute("SELECT * FROM users ORDER BY id")
     users_list = cur.fetchall()
     cur.close()
     conn.close()
@@ -481,6 +494,45 @@ def add_user():
         conn.close()
     return redirect(url_for('users'))
 
+@app.route('/edit_user_password', methods=['POST'])
+def edit_user_password():
+    if session.get('role') == 'admin':
+        user_id = request.form.get('user_id')
+        new_password = request.form.get('new_password')
+        if user_id and new_password:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute("UPDATE users SET password=%s WHERE id=%s", (generate_password_hash(new_password), user_id))
+                conn.commit()
+                L = LANGS.get(session.get('lang', 'ar'), LANGS['ar'])
+                flash(L['pass_changed'], "success")
+            except Exception as e:
+                conn.rollback()
+            cur.close()
+            conn.close()
+    return redirect(url_for('users'))
+
+# مسار جديد لتعديل الصلاحية 
+@app.route('/edit_user_role', methods=['POST'])
+def edit_user_role():
+    if session.get('role') == 'admin':
+        user_id = request.form.get('user_id')
+        new_role = request.form.get('new_role')
+        if user_id and new_role in ['admin', 'entry', 'user']:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute("UPDATE users SET role=%s WHERE id=%s", (new_role, user_id))
+                conn.commit()
+                L = LANGS.get(session.get('lang', 'ar'), LANGS['ar'])
+                flash(L['role_changed'], "success")
+            except Exception as e:
+                conn.rollback()
+            cur.close()
+            conn.close()
+    return redirect(url_for('users'))
+
 @app.route('/delete_user/<int:uid>')
 def delete_user(uid):
     if session.get('role') == 'admin':
@@ -494,6 +546,7 @@ def delete_user(uid):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    L = LANGS.get(session.get('lang', 'ar'), LANGS['ar'])
     if request.method == 'POST':
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
@@ -501,16 +554,20 @@ def login():
         user = cur.fetchone()
         cur.close()
         conn.close()
-        if user and check_password_hash(user['password'], request.form['password']):
+        
+        if not user:
+            flash(L['err_username'], "error")
+        elif not check_password_hash(user['password'], request.form['password']):
+            flash(L['err_password'], "error")
+        else:
             session.permanent = bool(request.form.get('remember'))
             session['user'] = user['username']
             session['role'] = user['role']
             return redirect(url_for('index'))
-        # ملاحظة: تركنا رسائل الفلاش بالعربي لأنها تظهر لثانية واحدة
-        flash("فشل الدخول: تأكد من اسم المستخدم أو كلمة المرور", "error")
-    
-    L = LANGS.get(session.get('lang', 'ar'), LANGS['ar'])
+            
+    # استبدال نافذة المتصفح المزعجة بنافذة منبثقة جميلة
     login_html = f"""
+    <div class="scrollable-page">
     <div class="row justify-content-center align-items-center" style="min-height: 75vh;">
         <div class="col-md-5">
             <div class="card p-5 shadow-lg border-0 rounded-4" style="background: linear-gradient(145deg, #ffffff, #f8f9fa);">
@@ -521,33 +578,55 @@ def login():
                     <h3 class="fw-bold text-dark">{L['title']}</h3>
                     <p class="text-muted">{L['login_desc']}</p>
                 </div>
-                <form method="POST">
+                <form method="POST" autocomplete="off">
                     <div class="mb-3">
                         <label class="form-label fw-bold text-secondary">{L['username']}</label>
                         <div class="input-group shadow-sm">
                             <span class="input-group-text bg-white text-primary border-end-0"><i class="fas fa-user"></i></span>
-                            <input name="username" class="form-control border-start-0" placeholder="{L['username']}" required>
+                            <input type="text" name="username" class="form-control border-start-0" placeholder="{L['username']}" required autocomplete="off">
                         </div>
                     </div>
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <label class="form-label fw-bold text-secondary">{L['password']}</label>
                         <div class="input-group shadow-sm">
                             <span class="input-group-text bg-white text-primary border-end-0"><i class="fas fa-lock"></i></span>
-                            <input type="password" name="password" class="form-control border-start-0" placeholder="{L['password']}" required>
+                            <input type="password" name="password" class="form-control border-start-0" placeholder="{L['password']}" required autocomplete="new-password">
                         </div>
                     </div>
-                    <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" name="remember" id="remember" checked>
                             <label class="form-check-label text-muted" for="remember">
-                                {L['remember']} {L['keep_login']}
+                                {L['remember']}
                             </label>
                         </div>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#forgotPassModal" class="text-decoration-none small fw-bold">{L['forgot_pass']}</a>
                     </div>
                     <button class="btn btn-primary w-100 py-2 fs-5 rounded-3 shadow"><i class="fas fa-sign-in-alt me-2"></i> {L['login']}</button>
                 </form>
             </div>
         </div>
+    </div>
+    </div>
+
+    <div class="modal fade" id="forgotPassModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+          <div class="modal-header bg-info text-white border-0 rounded-top-4">
+            <h5 class="modal-title fw-bold"><i class="fas fa-info-circle me-2"></i>{L['admin_notice']}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body text-center py-5">
+            <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style="width: 80px; height: 80px;">
+                <i class="fas fa-headset fa-3x text-info"></i>
+            </div>
+            <p class="fs-5 mb-0 text-dark">{L['contact_admin']}</p>
+          </div>
+          <div class="modal-footer border-0 justify-content-center bg-light rounded-bottom-4 py-3">
+            <button type="button" class="btn btn-info text-white px-5 shadow-sm" data-bs-dismiss="modal">موافق</button>
+          </div>
+        </div>
+      </div>
     </div>
     """
     return render_ui(login_html)
@@ -661,7 +740,6 @@ def delete(pid):
         conn.commit()
         cur.close()
         conn.close()
-        flash("تم الحذف بنجاح", "success")
     return redirect(url_for('index'))
 
 @app.route('/set_lang/<lang>')
