@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from flask import Flask, request, redirect, render_template_string, session, url_for, flash, make_response, Response
 from werkzeug.security import generate_password_hash, check_password_hash 
-from flask_wtf.csrf import CSRFProtect 
+from flask_wtf.csrf import CSRFProtect, CSRFError 
 from flask_limiter import Limiter 
 from flask_limiter.util import get_remote_address 
 
@@ -67,6 +67,16 @@ def verify_session_and_role():
         if user_in_db['role'] != session.get('role'):
             session['role'] = user_in_db['role']
 
+# دالة ذكية لاصطياد خطأ انتهاء الجلسة (CSRF) وإرجاع المستخدم بأمان
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    lang_code = session.get('lang', 'ar')
+    if lang_code == 'ar':
+        flash("انتهت صلاحية الصفحة لدواعي أمنية، يرجى المحاولة مرة أخرى.", "warning")
+    else:
+        flash("Session expired for security reasons, please try again.", "warning")
+    return redirect(request.referrer or url_for('login'))
+
 def log_activity(username, action, details):
     conn = get_db_connection()
     if conn:
@@ -97,7 +107,7 @@ def sanitize_input(text, max_len=100):
 # =====================================================================
 LANGS = {
     'ar': {
-        'title': 'نظام إدارة الطابعات', 'home': 'الرئيسية', 'reports': 'التقارير', 'users_manage': 'إدارة المستخدمين',
+        'title': 'نظام الطابعات', 'home': 'الرئيسية', 'reports': 'التقارير', 'users_manage': 'إدارة المستخدمين',
         'add': 'إضافة', 'edit': 'تعديل', 'delete': 'حذف', 'search': 'بحث...', 'logout_btn': 'خروج',
         'status': 'الحالة', 'working': 'تعمل', 'maintenance': 'صيانة', 'broken': 'لا تعمل',
         'serial': 'الرقم التسلسلي', 'dept': 'القسم', 'name': 'نوع وموديل الطابعة', 'role': 'الدور',
@@ -119,10 +129,10 @@ LANGS = {
         'admin_notice': 'إشعار النظام', 'edit_role': 'تعديل الصلاحية', 'new_role': 'الصلاحية', 'role_changed': 'تم التعديل بنجاح!',
         'audit_logs': 'سجل النظام', 'next': 'التالي', 'prev': 'السابق', 'page': 'صفحة',
         'login_box_title': 'تسجيل الدخول',
-        'login_btn': 'دخول', 'footer_text': 'نظام إدارة الطابعات الإصدار 2.0 © 2026', 'ok_btn': 'حسناً'
+        'login_btn': 'دخول', 'footer_text': 'نظام الطابعات الإصدار 2.0 © 2026', 'ok_btn': 'حسناً'
     },
     'en': {
-        'title': 'Printers Management System', 'home': 'Dashboard', 'reports': 'Reports', 'users_manage': 'Users',
+        'title': 'Printers System', 'home': 'Dashboard', 'reports': 'Reports', 'users_manage': 'Users',
         'add': 'Add', 'edit': 'Edit', 'delete': 'Delete', 'search': 'Search...', 'logout_btn': 'Logout',
         'status': 'Status', 'working': 'Working', 'maintenance': 'Maintenance', 'broken': 'Broken',
         'serial': 'Serial Number', 'dept': 'Department', 'name': 'Printer Model', 'role': 'Role',
@@ -144,7 +154,7 @@ LANGS = {
         'admin_notice': 'System Notice', 'edit_role': 'Change Role', 'new_role': 'Role', 'role_changed': 'Role updated!',
         'audit_logs': 'Audit Logs', 'next': 'Next', 'prev': 'Prev', 'page': 'Page',
         'login_box_title': 'Login',
-        'login_btn': 'Login', 'footer_text': 'Printer Management System v2.0 © 2026', 'ok_btn': 'OK'
+        'login_btn': 'Login', 'footer_text': 'Printers System v2.0 © 2026', 'ok_btn': 'OK'
     }
 }
 
@@ -729,7 +739,6 @@ def upload_csv():
                     status = sanitize_input(row[3], 20)
                     code = sanitize_input(row[4], 50)
                     
-                    # إصلاح مشكلة قراءة العمود السابع (نوع الطباعة والملاحظات)
                     if len(row) >= 7:
                         color_val = sanitize_input(row[5], 20)
                         notes = sanitize_input(row[6], 250)
