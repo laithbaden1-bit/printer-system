@@ -305,9 +305,6 @@ DASHBOARD_UI = """
 
 EDIT_UI = """<div class="d-flex flex-column h-100"><div class="row mb-3"><div class="col-12"><h4 class="fw-bold" style="color: #1e3a8a;"><i class="fas fa-edit me-2"></i> {{ L['edit_printer'] }}</h4></div></div><div class="card p-4 border-0 shadow-sm bg-white rounded-1"><form action="/edit/{{ printer['id'] }}" method="POST" class="row g-3" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="col-md-4"><label class="fw-bold small text-muted mb-1">{{ L['name'] }}</label><input name="name" class="form-control" value="{{ printer['name'] }}" required maxlength="100" autocomplete="off"></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['serial'] }}</label><input name="serial" class="form-control" value="{{ printer['serial'] }}" required maxlength="50" autocomplete="off"></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['dept'] }}</label><input name="dept" class="form-control" value="{{ printer['department'] }}" maxlength="100" autocomplete="off"></div><div class="col-md-2"><label class="fw-bold small text-muted mb-1">{{ L['code'] }}</label><input name="code" class="form-control" value="{{ printer['code'] }}" maxlength="50" autocomplete="off"></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['status'] }}</label><select name="status" class="form-select"><option value="Working" {% if printer['status'] == 'Working' %}selected{% endif %}>{{ L['working'] }}</option><option value="Maintenance" {% if printer['status'] == 'Maintenance' %}selected{% endif %}>{{ L['maintenance'] }}</option><option value="Broken" {% if printer['status'] == 'Broken' %}selected{% endif %}>{{ L['broken'] }}</option></select></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['color_type'] }}</label><select name="color_type" class="form-select"><option value="BW" {% if printer['color_type'] == 'BW' %}selected{% endif %}>{{ L['bw'] }}</option><option value="Color" {% if printer['color_type'] == 'Color' %}selected{% endif %}>{{ L['color'] }}</option></select></div><div class="col-md-6"><label class="fw-bold small text-muted mb-1">{{ L['notes'] }}</label><input name="notes" class="form-control" value="{{ printer['notes'] }}" maxlength="250" autocomplete="off"></div><div class="col-12 mt-4 pt-3 border-top text-end"><a href="/" class="btn btn-light border px-4 fw-bold ms-2">{{ L['cancel'] }}</a><button class="btn px-4 fw-bold text-white" style="background-color: #1e3a8a;"><i class="fas fa-save me-1"></i> {{ L['save'] }}</button></div></form></div></div>"""
 
-# ---------------------------------------------------------------------
-# التعديل الجديد: واجهة تقارير احترافية حديثة (Modern Analytics Dashboard)
-# ---------------------------------------------------------------------
 REPORTS_UI = """
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -480,7 +477,234 @@ document.addEventListener("DOMContentLoaded", function() {
 </script>
 """
 
-USERS_UI = """<div class="d-flex flex-column h-100"><div class="d-flex justify-content-between align-items-center mb-3"><h4 class="fw-bold m-0" style="color: #1e3a8a;"><i class="fas fa-users-cog me-2"></i> {{ L['users_manage'] }}</h4><a href="/audit" class="btn btn-sm btn-outline-secondary fw-bold bg-white shadow-sm"><i class="fas fa-clipboard-list me-1"></i> {{ L['audit_logs'] }}</a></div><div class="card p-3 mb-3 border-0 shadow-sm bg-white rounded-1"><form action="/add_user" method="POST" class="row g-2 align-items-end" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="col-md-3"><label class="small fw-bold text-muted mb-1">{{ L['username'] }}</label><input name="username" class="form-control form-control-sm bg-light" required autocomplete="off" maxlength="30"></div><div class="col-md-3"><label class="small fw-bold text-muted mb-1">{{ L['password'] }}</label><input type="password" name="password" class="form-control form-control-sm bg-light" required autocomplete="new-password" maxlength="50"></div><div class="col-md-3"><label class="small fw-bold text-muted mb-1">{{ L['role'] }}</label><select name="role" class="form-select form-select-sm bg-light"><option value="admin">{{ L['admin'] }}</option><option value="entry">{{ L['entry'] }}</option><option value="user">{{ L['user'] }}</option></select></div><div class="col-md-3"><button class="btn btn-sm text-white w-100 fw-bold" style="background-color: #1e3a8a;"><i class="fas fa-user-plus me-1"></i> {{ L['add'] }}</button></div></form></div><div class="card shadow-sm border-0 rounded-1 flex-grow-1 overflow-hidden d-flex flex-column"><div class="table-responsive flex-grow-1 custom-scrollbar"><table class="table table-hover table-striped align-middle mb-0"><thead class="table-dark" style="position: sticky; top: 0; z-index: 10;"><tr><th style="background-color: #1e3a8a;" class="px-4">{{ L['username'] }}</th><th style="background-color: #1e3a8a;">{{ L['role'] }}</th><th style="background-color: #1e3a8a; width: 150px;" class="text-center">{{ L['actions'] }}</th></tr></thead><tbody>{% for u in users %}<tr><td class="fw-bold px-4">{{ u['username'] }}</td><td><span class="badge border text-dark bg-light px-3 py-1">{{ L[u['role']] }}</span></td><td class="text-center"><div class="d-flex justify-content-center gap-1"><button type="button" class="btn btn-sm btn-light border py-0 px-2 text-primary" onclick="showEditPassModal({{ u['id'] }}, '{{ u['username'] }}')" title="{{ L['edit_pass'] }}"><i class="fas fa-key"></i></button>{% if u['username'] != 'admin' %}<button type="button" class="btn btn-sm btn-light border py-0 px-2 text-warning" onclick="showEditRoleModal({{ u['id'] }}, '{{ u['username'] }}', '{{ u['role'] }}')" title="{{ L['edit_role'] }}"><i class="fas fa-user-tag"></i></button><button type="button" class="btn btn-sm btn-light border py-0 px-2 text-danger" onclick="showDeleteUserModal({{ u['id'] }})"><i class="fas fa-trash"></i></button>{% endif %}</div></td></tr>{% endfor %}</tbody></table></div></div></div><div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-2"><div class="modal-header bg-danger text-white border-0 py-2 rounded-top-2"><h6 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>{{ L['confirm_delete_title'] }}</h6><button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button></div><form id="deleteUserForm" method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body text-center py-4"><p class="mb-0 text-dark fw-bold">{{ L['confirm_delete_msg'] }}</p></div><div class="modal-footer border-0 justify-content-center bg-light py-2"><button type="button" class="btn btn-sm btn-secondary px-4 fw-bold" data-bs-dismiss="modal">{{ L['cancel'] }}</button><button type="submit" class="btn btn-sm btn-danger px-4 fw-bold">{{ L['yes_delete'] }}</button></div></form></div></div></div><div class="modal fade" id="editPassModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-2"><div class="modal-header text-white border-0 py-2 rounded-top-2" style="background-color: #1e3a8a;"><h6 class="modal-title fw-bold"><i class="fas fa-key me-2"></i>{{ L['edit_pass'] }}</h6><button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button></div><form action="/edit_user_password" method="POST" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body py-3"><input type="hidden" name="user_id" id="editPassUserId"><div class="mb-2 text-center text-primary fw-bold" id="editPassUsername"></div><div><label class="form-label fw-bold small text-muted">{{ L['new_pass'] }}</label><input type="password" name="new_password" class="form-control form-control-sm" required autocomplete="new-password" maxlength="50"></div></div><div class="modal-footer border-0 justify-content-center bg-light py-2"><button type="button" class="btn btn-sm btn-secondary px-3 fw-bold" data-bs-dismiss="modal">{{ L['cancel'] }}</button><button type="submit" class="btn btn-sm text-white px-3 fw-bold" style="background-color: #1e3a8a;">{{ L['save'] }}</button></div></form></div></div></div><div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-2"><div class="modal-header bg-warning text-dark border-0 py-2 rounded-top-2"><h6 class="modal-title fw-bold"><i class="fas fa-user-tag me-2"></i>{{ L['edit_role'] }}</h6><button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button></div><form action="/edit_user_role" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body py-3"><input type="hidden" name="user_id" id="editRoleUserId"><div class="mb-2 text-center fw-bold" id="editRoleUsername"></div><div><label class="form-label fw-bold small text-muted">{{ L['new_role'] }}</label><select name="new_role" id="editRoleSelect" class="form-select form-select-sm"><option value="admin">{{ L['admin'] }}</option><option value="entry">{{ L['entry'] }}</option><option value="user">{{ L['user'] }}</option></select></div></div><div class="modal-footer border-0 justify-content-center bg-light py-2"><button type="button" class="btn btn-sm btn-secondary px-3 fw-bold" data-bs-dismiss="modal">{{ L['cancel'] }}</button><button type="submit" class="btn btn-sm btn-warning px-3 fw-bold">{{ L['save'] }}</button></div></form></div></div></div><script>function showDeleteUserModal(userId) { document.getElementById('deleteUserForm').action = '/delete_user/' + userId; var myModal = new bootstrap.Modal(document.getElementById('deleteUserModal')); myModal.show(); } function showEditPassModal(userId, username) { document.getElementById('editPassUserId').value = userId; document.getElementById('editPassUsername').innerText = username; var myModal = new bootstrap.Modal(document.getElementById('editPassModal')); myModal.show(); } function showEditRoleModal(userId, username, currentRole) { document.getElementById('editRoleUserId').value = userId; document.getElementById('editRoleUsername').innerText = username; document.getElementById('editRoleSelect').value = currentRole; var myModal = new bootstrap.Modal(document.getElementById('editRoleModal')); myModal.show(); }</script>"""
+# ---------------------------------------------------------------------
+# التعديل الجديد: واجهة إدارة المستخدمين الاحترافية (Modern Users UI)
+# ---------------------------------------------------------------------
+USERS_UI = """
+<style>
+    /* تصميم أزرار الإجراءات الاحترافية */
+    .action-btn { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: all 0.2s ease; border: none; text-decoration: none; cursor: pointer;}
+    .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+    .btn-edit-pass { background-color: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+    .btn-edit-pass:hover { background-color: #3b82f6; color: white; }
+    .btn-edit-role { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .btn-edit-role:hover { background-color: #f59e0b; color: white; }
+    .btn-delete-user { background-color: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    .btn-delete-user:hover { background-color: #ef4444; color: white; }
+</style>
+
+<div class="d-flex flex-column h-100">
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-8">
+            <h4 class="fw-bolder m-0" style="color: #1e3a8a;"><i class="fas fa-users-cog me-2"></i> {{ L['users_manage'] }}</h4>
+            <p class="text-muted small mt-1 mb-0">إدارة الصلاحيات وحسابات موظفي النظام</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="/audit" class="btn btn-light bg-white border-0 shadow-sm fw-bold rounded-pill px-4 text-primary">
+                <i class="fas fa-clipboard-list me-2"></i> {{ L['audit_logs'] }}
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 mb-4 flex-shrink-0">
+        <div class="card-header bg-white border-bottom-0 pt-4 pb-2 px-4">
+            <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-user-plus me-2 text-primary"></i> إضافة مستخدم جديد</h6>
+        </div>
+        <div class="card-body px-4 pb-4 pt-2">
+            <form action="/add_user" method="POST" class="row g-3 align-items-end" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted mb-1">{{ L['username'] }}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-user"></i></span>
+                        <input name="username" class="form-control border-start-0 bg-light" required autocomplete="off" maxlength="30">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted mb-1">{{ L['password'] }}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-lock"></i></span>
+                        <input type="password" name="password" class="form-control border-start-0 bg-light" required autocomplete="new-password" maxlength="50">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="small fw-bold text-muted mb-1">{{ L['role'] }}</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-user-shield"></i></span>
+                        <select name="role" class="form-select border-start-0 bg-light">
+                            <option value="admin">{{ L['admin'] }}</option>
+                            <option value="entry">{{ L['entry'] }}</option>
+                            <option value="user">{{ L['user'] }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn text-white w-100 fw-bold rounded-3 shadow-sm" style="background-color: #1e3a8a; height: 38px;">
+                        {{ L['add'] }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 rounded-4 flex-grow-1 overflow-hidden d-flex flex-column">
+        <div class="table-responsive flex-grow-1 custom-scrollbar">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light" style="position: sticky; top: 0; z-index: 10;">
+                    <tr>
+                        <th class="px-4 py-3 text-muted fw-bold border-bottom-0">{{ L['username'] }}</th>
+                        <th class="py-3 text-muted fw-bold border-bottom-0">{{ L['role'] }}</th>
+                        <th class="py-3 text-center text-muted fw-bold border-bottom-0" style="width: 180px;">{{ L['actions'] }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td class="fw-bold px-4 text-dark py-3 border-light">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px;">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <span>{{ u['username'] }}</span>
+                            </div>
+                        </td>
+                        <td class="border-light">
+                            {% set role_color = 'danger' if u['role'] == 'admin' else ('success' if u['role'] == 'entry' else 'secondary') %}
+                            <span class="badge bg-{{ role_color }} bg-opacity-10 text-{{ role_color }} px-3 py-2 rounded-pill fw-bold border border-{{ role_color }} border-opacity-25">
+                                <i class="fas {% if u['role'] == 'admin' %}fa-crown{% elif u['role'] == 'entry' %}fa-keyboard{% else %}fa-user{% endif %} me-1"></i> {{ L[u['role']] }}
+                            </span>
+                        </td>
+                        <td class="text-center border-light">
+                            <div class="d-flex justify-content-center gap-2">
+                                <button type="button" class="action-btn btn-edit-pass" onclick="showEditPassModal({{ u['id'] }}, '{{ u['username'] }}')" title="{{ L['edit_pass'] }}">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                                {% if u['username'] != 'admin' %}
+                                <button type="button" class="action-btn btn-edit-role" onclick="showEditRoleModal({{ u['id'] }}, '{{ u['username'] }}', '{{ u['role'] }}')" title="{{ L['edit_role'] }}">
+                                    <i class="fas fa-user-tag"></i>
+                                </button>
+                                <button type="button" class="action-btn btn-delete-user" onclick="showDeleteUserModal({{ u['id'] }})" title="{{ L['delete'] }}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow rounded-4">
+      <div class="modal-header border-0 pb-0 justify-content-center mt-3">
+        <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+            <i class="fas fa-exclamation-triangle fa-2x"></i>
+        </div>
+      </div>
+      <form id="deleteUserForm" method="POST" action="">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="modal-body text-center py-4">
+            <h6 class="fw-bold text-dark mb-2">{{ L['confirm_delete_title'] }}</h6>
+            <p class="mb-0 text-muted small">هل أنت متأكد من حذف هذا الحساب نهائياً؟ لا يمكن التراجع عن هذا الإجراء.</p>
+          </div>
+          <div class="modal-footer border-0 justify-content-center bg-light py-3 rounded-bottom-4">
+            <button type="button" class="btn btn-light shadow-sm px-4 fw-bold text-muted border" data-bs-dismiss="modal">{{ L['cancel'] }}</button>
+            <button type="submit" class="btn btn-danger shadow-sm px-4 fw-bold">{{ L['yes_delete'] }}</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editPassModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow rounded-4">
+      <div class="modal-header border-0 pb-0 justify-content-center mt-3">
+        <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+            <i class="fas fa-key fa-2x"></i>
+        </div>
+      </div>
+      <form action="/edit_user_password" method="POST" autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="modal-body py-3 px-4">
+            <input type="hidden" name="user_id" id="editPassUserId">
+            <div class="text-center mb-3">
+                <h6 class="fw-bold text-dark mb-0">{{ L['edit_pass'] }}</h6>
+                <small class="text-primary fw-bold" id="editPassUsername"></small>
+            </div>
+            <div>
+                <label class="form-label fw-bold small text-muted">{{ L['new_pass'] }}</label>
+                <input type="password" name="new_password" class="form-control bg-light" required autocomplete="new-password" maxlength="50">
+            </div>
+          </div>
+          <div class="modal-footer border-0 justify-content-center bg-light py-3 rounded-bottom-4">
+            <button type="button" class="btn btn-light shadow-sm px-3 fw-bold text-muted border" data-bs-dismiss="modal">{{ L['cancel'] }}</button>
+            <button type="submit" class="btn text-white shadow-sm px-4 fw-bold" style="background-color: #1e3a8a;">{{ L['save'] }}</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow rounded-4">
+      <div class="modal-header border-0 pb-0 justify-content-center mt-3">
+        <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+            <i class="fas fa-user-shield fa-2x"></i>
+        </div>
+      </div>
+      <form action="/edit_user_role" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <div class="modal-body py-3 px-4">
+            <input type="hidden" name="user_id" id="editRoleUserId">
+            <div class="text-center mb-3">
+                <h6 class="fw-bold text-dark mb-0">{{ L['edit_role'] }}</h6>
+                <small class="text-warning fw-bold" id="editRoleUsername"></small>
+            </div>
+            <div>
+                <label class="form-label fw-bold small text-muted">{{ L['new_role'] }}</label>
+                <select name="new_role" id="editRoleSelect" class="form-select bg-light">
+                    <option value="admin">{{ L['admin'] }}</option>
+                    <option value="entry">{{ L['entry'] }}</option>
+                    <option value="user">{{ L['user'] }}</option>
+                </select>
+            </div>
+          </div>
+          <div class="modal-footer border-0 justify-content-center bg-light py-3 rounded-bottom-4">
+            <button type="button" class="btn btn-light shadow-sm px-3 fw-bold text-muted border" data-bs-dismiss="modal">{{ L['cancel'] }}</button>
+            <button type="submit" class="btn btn-warning text-dark shadow-sm px-4 fw-bold">{{ L['save'] }}</button>
+          </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showDeleteUserModal(userId) { 
+    document.getElementById('deleteUserForm').action = '/delete_user/' + userId; 
+    var myModal = new bootstrap.Modal(document.getElementById('deleteUserModal')); 
+    myModal.show(); 
+} 
+function showEditPassModal(userId, username) { 
+    document.getElementById('editPassUserId').value = userId; 
+    document.getElementById('editPassUsername').innerText = '@' + username; 
+    var myModal = new bootstrap.Modal(document.getElementById('editPassModal')); 
+    myModal.show(); 
+} 
+function showEditRoleModal(userId, username, currentRole) { 
+    document.getElementById('editRoleUserId').value = userId; 
+    document.getElementById('editRoleUsername').innerText = '@' + username; 
+    document.getElementById('editRoleSelect').value = currentRole; 
+    var myModal = new bootstrap.Modal(document.getElementById('editRoleModal')); 
+    myModal.show(); 
+}
+</script>
+"""
 
 AUDIT_UI = """<div class="d-flex flex-column h-100"><div class="row mb-3"><div class="col-12"><h4 class="fw-bold" style="color: #1e3a8a;"><i class="fas fa-clipboard-check me-2"></i> {{ L['audit_logs'] }}</h4></div></div><div class="card shadow-sm border-0 rounded-1 flex-grow-1 overflow-hidden d-flex flex-column"><div class="table-responsive flex-grow-1 custom-scrollbar"><table class="table table-striped table-hover align-middle mb-0"><thead class="table-dark" style="position: sticky; top: 0; z-index: 10;"><tr><th style="background-color: #1e3a8a; width: 20%;" class="px-4">{{ L['username'] }}</th><th style="background-color: #1e3a8a; width: 20%;">{{ L['actions'] }}</th><th style="background-color: #1e3a8a; width: 40%;">التفاصيل</th><th style="background-color: #1e3a8a; width: 20%;">الوقت</th></tr></thead><tbody>{% for log in logs %}<tr><td class="fw-bold px-4">{{ log['username'] }}</td><td><span class="badge border text-dark bg-light px-2 py-1"><i class="fas fa-angle-left me-1 text-primary"></i> {{ log['action'] }}</span></td><td class="text-muted"><small>{{ log['details'] }}</small></td><td dir="ltr"><span class="badge bg-secondary text-white font-monospace">{{ log['timestamp'] }}</span></td></tr>{% else %}<tr><td colspan="4" class="text-center py-5 text-muted"><i class="fas fa-check-circle fa-3x mb-3 text-light"></i><br><span class="fw-bold">{{ L['no_data'] }}</span></td></tr>{% endfor %}</tbody></table></div></div></div>"""
 
