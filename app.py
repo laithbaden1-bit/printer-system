@@ -160,7 +160,6 @@ LANGS = {
 # =====================================================================
 # 5. واجهات العرض (HTML) 
 # =====================================================================
-# تم إيقاف الاقتراحات التلقائية (autocomplete="off") للبحث
 DASHBOARD_UI = """
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="fw-bold m-0" style="color: #1e3a8a;"><i class="fas fa-desktop me-2"></i> {{ L['home'] }}</h4>
@@ -304,10 +303,182 @@ DASHBOARD_UI = """
 <script>function showDeleteModal(printerId) { document.getElementById('deleteForm').action = '/delete/' + printerId; var myModal = new bootstrap.Modal(document.getElementById('deleteModal')); myModal.show(); }</script>
 """
 
-# تم إيقاف الاقتراحات التلقائية للتعديل أيضاً
 EDIT_UI = """<div class="d-flex flex-column h-100"><div class="row mb-3"><div class="col-12"><h4 class="fw-bold" style="color: #1e3a8a;"><i class="fas fa-edit me-2"></i> {{ L['edit_printer'] }}</h4></div></div><div class="card p-4 border-0 shadow-sm bg-white rounded-1"><form action="/edit/{{ printer['id'] }}" method="POST" class="row g-3" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="col-md-4"><label class="fw-bold small text-muted mb-1">{{ L['name'] }}</label><input name="name" class="form-control" value="{{ printer['name'] }}" required maxlength="100" autocomplete="off"></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['serial'] }}</label><input name="serial" class="form-control" value="{{ printer['serial'] }}" required maxlength="50" autocomplete="off"></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['dept'] }}</label><input name="dept" class="form-control" value="{{ printer['department'] }}" maxlength="100" autocomplete="off"></div><div class="col-md-2"><label class="fw-bold small text-muted mb-1">{{ L['code'] }}</label><input name="code" class="form-control" value="{{ printer['code'] }}" maxlength="50" autocomplete="off"></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['status'] }}</label><select name="status" class="form-select"><option value="Working" {% if printer['status'] == 'Working' %}selected{% endif %}>{{ L['working'] }}</option><option value="Maintenance" {% if printer['status'] == 'Maintenance' %}selected{% endif %}>{{ L['maintenance'] }}</option><option value="Broken" {% if printer['status'] == 'Broken' %}selected{% endif %}>{{ L['broken'] }}</option></select></div><div class="col-md-3"><label class="fw-bold small text-muted mb-1">{{ L['color_type'] }}</label><select name="color_type" class="form-select"><option value="BW" {% if printer['color_type'] == 'BW' %}selected{% endif %}>{{ L['bw'] }}</option><option value="Color" {% if printer['color_type'] == 'Color' %}selected{% endif %}>{{ L['color'] }}</option></select></div><div class="col-md-6"><label class="fw-bold small text-muted mb-1">{{ L['notes'] }}</label><input name="notes" class="form-control" value="{{ printer['notes'] }}" maxlength="250" autocomplete="off"></div><div class="col-12 mt-4 pt-3 border-top text-end"><a href="/" class="btn btn-light border px-4 fw-bold ms-2">{{ L['cancel'] }}</a><button class="btn px-4 fw-bold text-white" style="background-color: #1e3a8a;"><i class="fas fa-save me-1"></i> {{ L['save'] }}</button></div></form></div></div>"""
 
-REPORTS_UI = """<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><div class="custom-scrollbar overflow-auto h-100 pe-2"><div class="row mb-3"><div class="col-12"><h4 class="fw-bold" style="color: #1e3a8a;"><i class="fas fa-chart-pie me-2"></i> {{ L['reports'] }}</h4></div></div><div class="row g-3 text-center mb-4"><div class="col-md-3"><div class="card p-3 bg-white border-0 shadow-sm rounded-1 h-100 border-start border-4 border-primary"><h6 class="text-muted fw-bold mb-2">{{ L['total'] }}</h6><h3 class="text-primary fw-bold mb-0">{{ stats['total'] }}</h3></div></div><div class="col-md-3"><div class="card p-3 bg-white border-0 shadow-sm rounded-1 h-100 border-start border-4 border-success"><h6 class="text-muted fw-bold mb-2">{{ L['working'] }}</h6><h3 class="text-success fw-bold mb-0">{{ stats['active'] }}</h3></div></div><div class="col-md-3"><div class="card p-3 bg-white border-0 shadow-sm rounded-1 h-100 border-start border-4 border-warning"><h6 class="text-muted fw-bold mb-2">{{ L['maintenance'] }}</h6><h3 class="text-warning fw-bold mb-0">{{ stats['maint'] }}</h3></div></div><div class="col-md-3"><div class="card p-3 bg-white border-0 shadow-sm rounded-1 h-100 border-start border-4 border-danger"><h6 class="text-muted fw-bold mb-2">{{ L['broken'] }}</h6><h3 class="text-danger fw-bold mb-0">{{ stats['broken'] }}</h3></div></div></div><div class="row g-3"><div class="col-md-4"><div class="card p-3 shadow-sm border-0 rounded-1 h-100"><h6 class="text-center text-muted fw-bold mb-3 border-bottom pb-2">{{ L['printers_status'] }}</h6><div style="height: 220px;"><canvas id="statusChart"></canvas></div></div></div><div class="col-md-4"><div class="card p-3 shadow-sm border-0 rounded-1 h-100"><h6 class="text-center text-muted fw-bold mb-3 border-bottom pb-2">{{ L['print_type_chart'] }}</h6><div style="height: 220px;"><canvas id="typeChart"></canvas></div></div></div><div class="col-md-4"><div class="card p-0 shadow-sm border-0 rounded-1 h-100 d-flex flex-column"><h6 class="text-center text-muted fw-bold p-3 m-0 border-bottom">{{ L['dept_dist'] }}</h6><div class="table-responsive flex-grow-1 custom-scrollbar"><table class="table table-sm table-striped text-center align-middle mb-0"><thead class="table-light sticky-top"><tr><th class="text-start px-3 py-2">{{ L['dept'] }}</th><th class="py-2">{{ L['count'] }}</th></tr></thead><tbody>{% for dept in dept_stats %}<tr><td class="text-start px-3"><small class="fw-bold">{{ dept['department'] }}</small></td><td><span class="badge text-white" style="background-color: #1e3a8a;">{{ dept['count'] }}</span></td></tr>{% else %}<tr><td colspan="2" class="text-muted py-4">{{ L['no_dept_data'] }}</td></tr>{% endfor %}</tbody></table></div></div></div></div></div><script>document.addEventListener("DOMContentLoaded", function() { new Chart(document.getElementById('statusChart'), { type: 'doughnut', data: { labels: ['{{ L["working"] }}', '{{ L["maintenance"] }}', '{{ L["broken"] }}'], datasets: [{ data: [{{ stats['active'] }}, {{ stats['maint'] }}, {{ stats['broken'] }}], backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], borderWidth: 0, hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: {font: {family: 'Tajawal'}} } } } }); new Chart(document.getElementById('typeChart'), { type: 'pie', data: { labels: ['{{ L["color"] }}', '{{ L["bw"] }}'], datasets: [{ data: [{{ stats['color'] }}, {{ stats['bw'] }}], backgroundColor: ['#3b82f6', '#64748b'], borderWidth: 0, hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: {font: {family: 'Tajawal'}} } } } }); });</script>"""
+# ---------------------------------------------------------------------
+# التعديل الجديد: واجهة تقارير احترافية حديثة (Modern Analytics Dashboard)
+# ---------------------------------------------------------------------
+REPORTS_UI = """
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; border-radius: 12px; border: 1px solid #e2e8f0; }
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important; }
+    .stat-icon-wrap { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; border-radius: 16px; }
+</style>
+
+<div class="d-flex flex-column h-100 pe-2">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h4 class="fw-bolder m-0" style="color: #1e3a8a;"><i class="fas fa-chart-line me-2"></i> {{ L['reports'] }}</h4>
+            <p class="text-muted small mt-1 mb-0">نظرة عامة تحليلية ومؤشرات الأداء</p>
+        </div>
+    </div>
+    
+    <div class="row g-4 mb-4 flex-shrink-0">
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card bg-white h-100 border-0 shadow-sm" style="border-bottom: 4px solid #3b82f6 !important;">
+                <div class="card-body p-4 d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-muted fw-bold mb-1">{{ L['total'] }}</h6>
+                        <h2 class="fw-black mb-0 text-dark" style="font-size: 2.5rem; letter-spacing: -1px;">{{ stats['total'] }}</h2>
+                    </div>
+                    <div class="stat-icon-wrap bg-primary bg-opacity-10 text-primary">
+                        <i class="fas fa-print fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card bg-white h-100 border-0 shadow-sm" style="border-bottom: 4px solid #10b981 !important;">
+                <div class="card-body p-4 d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-muted fw-bold mb-1">{{ L['working'] }}</h6>
+                        <h2 class="fw-black mb-0 text-dark" style="font-size: 2.5rem; letter-spacing: -1px;">{{ stats['active'] }}</h2>
+                    </div>
+                    <div class="stat-icon-wrap bg-success bg-opacity-10 text-success">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card bg-white h-100 border-0 shadow-sm" style="border-bottom: 4px solid #f59e0b !important;">
+                <div class="card-body p-4 d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-muted fw-bold mb-1">{{ L['maintenance'] }}</h6>
+                        <h2 class="fw-black mb-0 text-dark" style="font-size: 2.5rem; letter-spacing: -1px;">{{ stats['maint'] }}</h2>
+                    </div>
+                    <div class="stat-icon-wrap bg-warning bg-opacity-10 text-warning">
+                        <i class="fas fa-tools fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6">
+            <div class="card stat-card bg-white h-100 border-0 shadow-sm" style="border-bottom: 4px solid #ef4444 !important;">
+                <div class="card-body p-4 d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-muted fw-bold mb-1">{{ L['broken'] }}</h6>
+                        <h2 class="fw-black mb-0 text-dark" style="font-size: 2.5rem; letter-spacing: -1px;">{{ stats['broken'] }}</h2>
+                    </div>
+                    <div class="stat-icon-wrap bg-danger bg-opacity-10 text-danger">
+                        <i class="fas fa-times-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4 flex-grow-1 pb-3">
+        <div class="col-lg-4 d-flex flex-column">
+            <div class="card border-0 shadow-sm rounded-4 flex-grow-1 d-flex flex-column h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-chart-pie me-2 text-primary"></i> {{ L['printers_status'] }}</h6>
+                </div>
+                <div class="card-body p-4 d-flex justify-content-center align-items-center flex-grow-1">
+                    <div style="height: 100%; width: 100%; min-height: 250px; max-height: 300px; position: relative;">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 d-flex flex-column">
+            <div class="card border-0 shadow-sm rounded-4 flex-grow-1 d-flex flex-column h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-0 px-4">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-palette me-2 text-primary"></i> {{ L['print_type_chart'] }}</h6>
+                </div>
+                <div class="card-body p-4 d-flex justify-content-center align-items-center flex-grow-1">
+                    <div style="height: 100%; width: 100%; min-height: 250px; max-height: 300px; position: relative;">
+                        <canvas id="typeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 d-flex flex-column">
+            <div class="card border-0 shadow-sm rounded-4 flex-grow-1 d-flex flex-column overflow-hidden h-100">
+                <div class="card-header bg-white border-bottom pt-4 pb-3 px-4 shadow-sm" style="z-index: 2;">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-building me-2 text-primary"></i> {{ L['dept_dist'] }}</h6>
+                </div>
+                <div class="card-body p-0 flex-grow-1 custom-scrollbar overflow-auto" style="height: 0; min-height: 250px;">
+                    <table class="table table-hover align-middle mb-0 text-center" style="font-size: 0.9rem;">
+                        <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                            <tr>
+                                <th class="text-start px-4 py-3 text-muted fw-bold border-bottom-0">{{ L['dept'] }}</th>
+                                <th class="py-3 text-muted fw-bold border-bottom-0" style="width: 100px;">{{ L['count'] }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dept in dept_stats %}
+                            <tr>
+                                <td class="text-start px-4 fw-bold text-dark border-light">{{ dept['department'] }}</td>
+                                <td class="border-light"><span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-2 fw-bold shadow-sm">{{ dept['count'] }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="2" class="text-muted py-5 border-0">{{ L['no_dept_data'] }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() { 
+    Chart.defaults.font.family = 'Tajawal';
+    Chart.defaults.color = '#64748b';
+    Chart.defaults.font.size = 13;
+    
+    const commonOptions = {
+        responsive: true, 
+        maintainAspectRatio: false, 
+        cutout: '75%',
+        layout: { padding: 10 },
+        plugins: { 
+            legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true, pointStyle: 'circle' } },
+            tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 12, cornerRadius: 8, titleFont: { size: 14 }, bodyFont: { size: 14 } }
+        }
+    };
+    
+    new Chart(document.getElementById('statusChart'), { 
+        type: 'doughnut', 
+        data: { 
+            labels: ['{{ L["working"] }}', '{{ L["maintenance"] }}', '{{ L["broken"] }}'], 
+            datasets: [{ 
+                data: [{{ stats['active'] }}, {{ stats['maint'] }}, {{ stats['broken'] }}], 
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444'], 
+                borderWidth: 0, hoverOffset: 8, borderRadius: 5
+            }] 
+        }, 
+        options: commonOptions 
+    }); 
+    
+    new Chart(document.getElementById('typeChart'), { 
+        type: 'doughnut', 
+        data: { 
+            labels: ['{{ L["color"] }}', '{{ L["bw"] }}'], 
+            datasets: [{ 
+                data: [{{ stats['color'] }}, {{ stats['bw'] }}], 
+                backgroundColor: ['#3b82f6', '#94a3b8'], 
+                borderWidth: 0, hoverOffset: 8, borderRadius: 5
+            }] 
+        }, 
+        options: commonOptions 
+    }); 
+});
+</script>
+"""
 
 USERS_UI = """<div class="d-flex flex-column h-100"><div class="d-flex justify-content-between align-items-center mb-3"><h4 class="fw-bold m-0" style="color: #1e3a8a;"><i class="fas fa-users-cog me-2"></i> {{ L['users_manage'] }}</h4><a href="/audit" class="btn btn-sm btn-outline-secondary fw-bold bg-white shadow-sm"><i class="fas fa-clipboard-list me-1"></i> {{ L['audit_logs'] }}</a></div><div class="card p-3 mb-3 border-0 shadow-sm bg-white rounded-1"><form action="/add_user" method="POST" class="row g-2 align-items-end" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="col-md-3"><label class="small fw-bold text-muted mb-1">{{ L['username'] }}</label><input name="username" class="form-control form-control-sm bg-light" required autocomplete="off" maxlength="30"></div><div class="col-md-3"><label class="small fw-bold text-muted mb-1">{{ L['password'] }}</label><input type="password" name="password" class="form-control form-control-sm bg-light" required autocomplete="new-password" maxlength="50"></div><div class="col-md-3"><label class="small fw-bold text-muted mb-1">{{ L['role'] }}</label><select name="role" class="form-select form-select-sm bg-light"><option value="admin">{{ L['admin'] }}</option><option value="entry">{{ L['entry'] }}</option><option value="user">{{ L['user'] }}</option></select></div><div class="col-md-3"><button class="btn btn-sm text-white w-100 fw-bold" style="background-color: #1e3a8a;"><i class="fas fa-user-plus me-1"></i> {{ L['add'] }}</button></div></form></div><div class="card shadow-sm border-0 rounded-1 flex-grow-1 overflow-hidden d-flex flex-column"><div class="table-responsive flex-grow-1 custom-scrollbar"><table class="table table-hover table-striped align-middle mb-0"><thead class="table-dark" style="position: sticky; top: 0; z-index: 10;"><tr><th style="background-color: #1e3a8a;" class="px-4">{{ L['username'] }}</th><th style="background-color: #1e3a8a;">{{ L['role'] }}</th><th style="background-color: #1e3a8a; width: 150px;" class="text-center">{{ L['actions'] }}</th></tr></thead><tbody>{% for u in users %}<tr><td class="fw-bold px-4">{{ u['username'] }}</td><td><span class="badge border text-dark bg-light px-3 py-1">{{ L[u['role']] }}</span></td><td class="text-center"><div class="d-flex justify-content-center gap-1"><button type="button" class="btn btn-sm btn-light border py-0 px-2 text-primary" onclick="showEditPassModal({{ u['id'] }}, '{{ u['username'] }}')" title="{{ L['edit_pass'] }}"><i class="fas fa-key"></i></button>{% if u['username'] != 'admin' %}<button type="button" class="btn btn-sm btn-light border py-0 px-2 text-warning" onclick="showEditRoleModal({{ u['id'] }}, '{{ u['username'] }}', '{{ u['role'] }}')" title="{{ L['edit_role'] }}"><i class="fas fa-user-tag"></i></button><button type="button" class="btn btn-sm btn-light border py-0 px-2 text-danger" onclick="showDeleteUserModal({{ u['id'] }})"><i class="fas fa-trash"></i></button>{% endif %}</div></td></tr>{% endfor %}</tbody></table></div></div></div><div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-2"><div class="modal-header bg-danger text-white border-0 py-2 rounded-top-2"><h6 class="modal-title fw-bold"><i class="fas fa-exclamation-triangle me-2"></i>{{ L['confirm_delete_title'] }}</h6><button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button></div><form id="deleteUserForm" method="POST" action=""><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body text-center py-4"><p class="mb-0 text-dark fw-bold">{{ L['confirm_delete_msg'] }}</p></div><div class="modal-footer border-0 justify-content-center bg-light py-2"><button type="button" class="btn btn-sm btn-secondary px-4 fw-bold" data-bs-dismiss="modal">{{ L['cancel'] }}</button><button type="submit" class="btn btn-sm btn-danger px-4 fw-bold">{{ L['yes_delete'] }}</button></div></form></div></div></div><div class="modal fade" id="editPassModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-2"><div class="modal-header text-white border-0 py-2 rounded-top-2" style="background-color: #1e3a8a;"><h6 class="modal-title fw-bold"><i class="fas fa-key me-2"></i>{{ L['edit_pass'] }}</h6><button type="button" class="btn-close btn-close-white btn-sm" data-bs-dismiss="modal"></button></div><form action="/edit_user_password" method="POST" autocomplete="off"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body py-3"><input type="hidden" name="user_id" id="editPassUserId"><div class="mb-2 text-center text-primary fw-bold" id="editPassUsername"></div><div><label class="form-label fw-bold small text-muted">{{ L['new_pass'] }}</label><input type="password" name="new_password" class="form-control form-control-sm" required autocomplete="new-password" maxlength="50"></div></div><div class="modal-footer border-0 justify-content-center bg-light py-2"><button type="button" class="btn btn-sm btn-secondary px-3 fw-bold" data-bs-dismiss="modal">{{ L['cancel'] }}</button><button type="submit" class="btn btn-sm text-white px-3 fw-bold" style="background-color: #1e3a8a;">{{ L['save'] }}</button></div></form></div></div></div><div class="modal fade" id="editRoleModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content border-0 shadow rounded-2"><div class="modal-header bg-warning text-dark border-0 py-2 rounded-top-2"><h6 class="modal-title fw-bold"><i class="fas fa-user-tag me-2"></i>{{ L['edit_role'] }}</h6><button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button></div><form action="/edit_user_role" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/><div class="modal-body py-3"><input type="hidden" name="user_id" id="editRoleUserId"><div class="mb-2 text-center fw-bold" id="editRoleUsername"></div><div><label class="form-label fw-bold small text-muted">{{ L['new_role'] }}</label><select name="new_role" id="editRoleSelect" class="form-select form-select-sm"><option value="admin">{{ L['admin'] }}</option><option value="entry">{{ L['entry'] }}</option><option value="user">{{ L['user'] }}</option></select></div></div><div class="modal-footer border-0 justify-content-center bg-light py-2"><button type="button" class="btn btn-sm btn-secondary px-3 fw-bold" data-bs-dismiss="modal">{{ L['cancel'] }}</button><button type="submit" class="btn btn-sm btn-warning px-3 fw-bold">{{ L['save'] }}</button></div></form></div></div></div><script>function showDeleteUserModal(userId) { document.getElementById('deleteUserForm').action = '/delete_user/' + userId; var myModal = new bootstrap.Modal(document.getElementById('deleteUserModal')); myModal.show(); } function showEditPassModal(userId, username) { document.getElementById('editPassUserId').value = userId; document.getElementById('editPassUsername').innerText = username; var myModal = new bootstrap.Modal(document.getElementById('editPassModal')); myModal.show(); } function showEditRoleModal(userId, username, currentRole) { document.getElementById('editRoleUserId').value = userId; document.getElementById('editRoleUsername').innerText = username; document.getElementById('editRoleSelect').value = currentRole; var myModal = new bootstrap.Modal(document.getElementById('editRoleModal')); myModal.show(); }</script>"""
 
@@ -370,7 +541,6 @@ def render_ui(content_html, **context):
             .form-control:focus, .form-select:focus { border-color: #1e3a8a; box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.15); }
             .btn { border-radius: 4px; font-weight: 700; letter-spacing: 0.2px; }
             
-            /* تصميم زر تسجيل الخروج الاحترافي (شفاف يندمج مع الشريط) */
             .btn-logout { background-color: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); transition: all 0.3s ease;}
             .btn-logout:hover { background-color: #dc2626; color: #fff; border-color: #dc2626; box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
 
